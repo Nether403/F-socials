@@ -1,0 +1,4 @@
+# Build/run artifacts
+app/out.txt
+app/status.txt
+app/gemini-report.json
