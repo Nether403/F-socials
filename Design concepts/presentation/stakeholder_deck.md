@@ -115,8 +115,8 @@ This presentation outlines the product vision, target audience research, core de
 * **Slide Title**: Design Roadmap & Implementation
 * **Visual Layout**: Horizontal timeline graph.
 * **Content**:
-  * **Phase 1: Foundation (Current)**: Finalize Design system, tokens, and strategy files.
-  * **Phase 2: Figma Prototyping**: Build the full component set and interactive screen flows.
-  * **Phase 3: Development Pilot**: Hand off specifications to frontend engineering for React scaffolding.
+  * **Phase 1: Foundation (Done)**: Design system + tokens + strategy files, **and** the build — the React app and analysis engine are live end-to-end (real providers, durable infra, the invariant gate, shareable reports).
+  * **Phase 2: Trust surfaces (Current)**: Methodology page, source-tier credibility upgrade, dispute/flag intake, accessibility (WCAG 2.2 AA) pass, safe public deploy. (See `f-Socials-roadmap.md`.)
+  * **Phase 3: Pilots**: Accounts/save, expert review queue, institutional workspace, EN/NL localization, EDMO/BENEDMO partnership.
 * **Presenter Script**:
-  > *"Our next steps are clear. Now that the design system foundations are approved, we will build out the complete interactive prototypes in Figma. Following that, we'll hand off these specs and tokens directly to the development team to pilot the first React scaffolding. Thank you, and I'd love to take your questions."*
+  > *"Our roadmap has moved fast. Phase 1 is done — not just the design system, but a working product: paste a link, get a shareable analysis, backed by a real engine and the invariant that every claim cites its source. We're now in Phase 2, hardening the trust surfaces — methodology, source credibility, disputes, accessibility — before a safe public launch. Phase 3 brings accounts, expert review, and the institutional workspace for our educator pilots. Thank you, and I'd love to take your questions."*

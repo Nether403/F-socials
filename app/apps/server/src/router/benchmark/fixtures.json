@@ -1,0 +1,1351 @@
+[
+  {
+    "id": "known_misinfo-001-5g-cell-towers-spread-the-covid-19-virus",
+    "originalClaim": "5G cell towers spread the COVID-19 virus.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/5g-cell-towers-spread-the-covid-19-virus",
+      "https://www.snopes.example/5g-cell-towers-spread-the-covid-19-virus"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/5g-cell-towers-spread-the-covid-19-virus",
+      "https://forum.example/thread/5g-cell-towers-spread-the-covid-19-virus"
+    ]
+  },
+  {
+    "id": "known_misinfo-002-drinking-bleach-cures-coronavirus-infect",
+    "originalClaim": "Drinking bleach cures coronavirus infections.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/drinking-bleach-cures-coronavirus-infect",
+      "https://www.snopes.example/drinking-bleach-cures-coronavirus-infect"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/drinking-bleach-cures-coronavirus-infect",
+      "https://forum.example/thread/drinking-bleach-cures-coronavirus-infect"
+    ]
+  },
+  {
+    "id": "known_misinfo-003-vaccines-contain-microchips-that-track-p",
+    "originalClaim": "Vaccines contain microchips that track people.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/vaccines-contain-microchips-that-track-p",
+      "https://www.snopes.example/vaccines-contain-microchips-that-track-p"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/vaccines-contain-microchips-that-track-p",
+      "https://forum.example/thread/vaccines-contain-microchips-that-track-p"
+    ]
+  },
+  {
+    "id": "known_misinfo-004-the-2020-moon-landing-footage-was-filmed",
+    "originalClaim": "The 2020 moon landing footage was filmed in a studio.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/the-2020-moon-landing-footage-was-filmed",
+      "https://www.snopes.example/the-2020-moon-landing-footage-was-filmed"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/the-2020-moon-landing-footage-was-filmed",
+      "https://forum.example/thread/the-2020-moon-landing-footage-was-filmed"
+    ]
+  },
+  {
+    "id": "known_misinfo-005-lemon-water-cures-stage-four-cancer",
+    "originalClaim": "Lemon water cures stage four cancer.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/lemon-water-cures-stage-four-cancer",
+      "https://www.snopes.example/lemon-water-cures-stage-four-cancer"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/lemon-water-cures-stage-four-cancer",
+      "https://forum.example/thread/lemon-water-cures-stage-four-cancer"
+    ]
+  },
+  {
+    "id": "known_misinfo-006-wind-turbines-cause-cancer-in-nearby-res",
+    "originalClaim": "Wind turbines cause cancer in nearby residents.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/wind-turbines-cause-cancer-in-nearby-res",
+      "https://www.snopes.example/wind-turbines-cause-cancer-in-nearby-res"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/wind-turbines-cause-cancer-in-nearby-res",
+      "https://forum.example/thread/wind-turbines-cause-cancer-in-nearby-res"
+    ]
+  },
+  {
+    "id": "known_misinfo-007-the-great-wall-of-china-is-visible-from-",
+    "originalClaim": "The Great Wall of China is visible from the Moon with the naked eye.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/the-great-wall-of-china-is-visible-from-",
+      "https://www.snopes.example/the-great-wall-of-china-is-visible-from-"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/the-great-wall-of-china-is-visible-from-",
+      "https://forum.example/thread/the-great-wall-of-china-is-visible-from-"
+    ]
+  },
+  {
+    "id": "known_misinfo-008-eating-carrots-dramatically-improves-nig",
+    "originalClaim": "Eating carrots dramatically improves night vision in adults.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/eating-carrots-dramatically-improves-nig",
+      "https://www.snopes.example/eating-carrots-dramatically-improves-nig"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/eating-carrots-dramatically-improves-nig",
+      "https://forum.example/thread/eating-carrots-dramatically-improves-nig"
+    ]
+  },
+  {
+    "id": "known_misinfo-009-humans-only-use-ten-percent-of-their-bra",
+    "originalClaim": "Humans only use ten percent of their brains.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/humans-only-use-ten-percent-of-their-bra",
+      "https://www.snopes.example/humans-only-use-ten-percent-of-their-bra"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/humans-only-use-ten-percent-of-their-bra",
+      "https://forum.example/thread/humans-only-use-ten-percent-of-their-bra"
+    ]
+  },
+  {
+    "id": "known_misinfo-010-5g-masten-verspreiden-het-coronavirus",
+    "originalClaim": "5G-masten verspreiden het coronavirus.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/5g-masten-verspreiden-het-coronavirus",
+      "https://www.snopes.example/5g-masten-verspreiden-het-coronavirus"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/5g-masten-verspreiden-het-coronavirus",
+      "https://forum.example/thread/5g-masten-verspreiden-het-coronavirus"
+    ]
+  },
+  {
+    "id": "known_misinfo-011-vaccins-bevatten-microchips-om-mensen-te",
+    "originalClaim": "Vaccins bevatten microchips om mensen te volgen.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/vaccins-bevatten-microchips-om-mensen-te",
+      "https://www.snopes.example/vaccins-bevatten-microchips-om-mensen-te"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/vaccins-bevatten-microchips-om-mensen-te",
+      "https://forum.example/thread/vaccins-bevatten-microchips-om-mensen-te"
+    ]
+  },
+  {
+    "id": "known_misinfo-012-knoflook-eten-beschermt-volledig-tegen-e",
+    "originalClaim": "Knoflook eten beschermt volledig tegen een corona-infectie.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/knoflook-eten-beschermt-volledig-tegen-e",
+      "https://www.snopes.example/knoflook-eten-beschermt-volledig-tegen-e"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/knoflook-eten-beschermt-volledig-tegen-e",
+      "https://forum.example/thread/knoflook-eten-beschermt-volledig-tegen-e"
+    ]
+  },
+  {
+    "id": "known_misinfo-013-het-drinken-van-warm-water-doodt-het-cor",
+    "originalClaim": "Het drinken van warm water doodt het coronavirus in de keel.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/het-drinken-van-warm-water-doodt-het-cor",
+      "https://www.snopes.example/het-drinken-van-warm-water-doodt-het-cor"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/het-drinken-van-warm-water-doodt-het-cor",
+      "https://forum.example/thread/het-drinken-van-warm-water-doodt-het-cor"
+    ]
+  },
+  {
+    "id": "known_misinfo-014-goldfish-have-a-memory-span-of-only-thre",
+    "originalClaim": "Goldfish have a memory span of only three seconds.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/goldfish-have-a-memory-span-of-only-thre",
+      "https://www.snopes.example/goldfish-have-a-memory-span-of-only-thre"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/goldfish-have-a-memory-span-of-only-thre",
+      "https://forum.example/thread/goldfish-have-a-memory-span-of-only-thre"
+    ]
+  },
+  {
+    "id": "known_misinfo-015-cracking-your-knuckles-causes-arthritis-",
+    "originalClaim": "Cracking your knuckles causes arthritis later in life.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/cracking-your-knuckles-causes-arthritis-",
+      "https://www.snopes.example/cracking-your-knuckles-causes-arthritis-"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/cracking-your-knuckles-causes-arthritis-",
+      "https://forum.example/thread/cracking-your-knuckles-causes-arthritis-"
+    ]
+  },
+  {
+    "id": "known_misinfo-016-sugar-consumption-makes-children-hyperac",
+    "originalClaim": "Sugar consumption makes children hyperactive.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/sugar-consumption-makes-children-hyperac",
+      "https://www.snopes.example/sugar-consumption-makes-children-hyperac"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/sugar-consumption-makes-children-hyperac",
+      "https://forum.example/thread/sugar-consumption-makes-children-hyperac"
+    ]
+  },
+  {
+    "id": "known_misinfo-017-bananas-are-radioactive-enough-to-be-dan",
+    "originalClaim": "Bananas are radioactive enough to be dangerous to eat.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/bananas-are-radioactive-enough-to-be-dan",
+      "https://www.snopes.example/bananas-are-radioactive-enough-to-be-dan"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/bananas-are-radioactive-enough-to-be-dan",
+      "https://forum.example/thread/bananas-are-radioactive-enough-to-be-dan"
+    ]
+  },
+  {
+    "id": "known_misinfo-018-lightning-never-strikes-the-same-place-t",
+    "originalClaim": "Lightning never strikes the same place twice.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/lightning-never-strikes-the-same-place-t",
+      "https://www.snopes.example/lightning-never-strikes-the-same-place-t"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/lightning-never-strikes-the-same-place-t",
+      "https://forum.example/thread/lightning-never-strikes-the-same-place-t"
+    ]
+  },
+  {
+    "id": "known_misinfo-019-a-swallowed-piece-of-chewing-gum-stays-i",
+    "originalClaim": "A swallowed piece of chewing gum stays in your stomach for seven years.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/a-swallowed-piece-of-chewing-gum-stays-i",
+      "https://www.snopes.example/a-swallowed-piece-of-chewing-gum-stays-i"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/a-swallowed-piece-of-chewing-gum-stays-i",
+      "https://forum.example/thread/a-swallowed-piece-of-chewing-gum-stays-i"
+    ]
+  },
+  {
+    "id": "known_misinfo-020-microwaving-food-destroys-all-of-its-nut",
+    "originalClaim": "Microwaving food destroys all of its nutrients.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "known_misinfo",
+    "idealOutcome": "matched_fact_check",
+    "acceptableUrls": [
+      "https://www.factcheck.example/microwaving-food-destroys-all-of-its-nut",
+      "https://www.snopes.example/microwaving-food-destroys-all-of-its-nut"
+    ],
+    "unacceptableUrls": [
+      "https://blog.example/opinion/microwaving-food-destroys-all-of-its-nut",
+      "https://forum.example/thread/microwaving-food-destroys-all-of-its-nut"
+    ]
+  },
+  {
+    "id": "known_misinfo-021-a-new-viral-diet-melts-belly-fat-in-thre",
+    "originalClaim": "A new viral diet melts belly fat in three days without exercise.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "known_misinfo",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://ads.example/diet-3-days"
+    ]
+  },
+  {
+    "id": "known_misinfo-022-een-onbekend-kruid-geneest-diabetes-type",
+    "originalClaim": "Een onbekend kruid geneest diabetes type 2 binnen een week.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "known_misinfo",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://webshop.example/kruid"
+    ]
+  },
+  {
+    "id": "recent_local-023-the-amsterdam-city-council-approved-a-ca",
+    "originalClaim": "The Amsterdam city council approved a car-free zone in the center in 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-amsterdam-city-council-approved-a-ca",
+      "https://www.localnews.example/the-amsterdam-city-council-approved-a-ca"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-amsterdam-city-council-approved-a-ca",
+      "https://www.othernews.example/unrelated/the-amsterdam-city-council-approved-a-ca"
+    ]
+  },
+  {
+    "id": "recent_local-024-de-gemeente-rotterdam-verhoogde-de-parke",
+    "originalClaim": "De gemeente Rotterdam verhoogde de parkeertarieven in januari 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/de-gemeente-rotterdam-verhoogde-de-parke",
+      "https://www.localnews.example/de-gemeente-rotterdam-verhoogde-de-parke"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/de-gemeente-rotterdam-verhoogde-de-parke",
+      "https://www.othernews.example/unrelated/de-gemeente-rotterdam-verhoogde-de-parke"
+    ]
+  },
+  {
+    "id": "recent_local-025-a-new-tram-line-opened-between-utrecht-c",
+    "originalClaim": "A new tram line opened between Utrecht Centraal and the science park in 2023.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/a-new-tram-line-opened-between-utrecht-c",
+      "https://www.localnews.example/a-new-tram-line-opened-between-utrecht-c"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/a-new-tram-line-opened-between-utrecht-c",
+      "https://www.othernews.example/unrelated/a-new-tram-line-opened-between-utrecht-c"
+    ]
+  },
+  {
+    "id": "recent_local-026-the-dutch-government-raised-the-minimum-",
+    "originalClaim": "The Dutch government raised the minimum wage in January 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-dutch-government-raised-the-minimum-",
+      "https://www.localnews.example/the-dutch-government-raised-the-minimum-"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-dutch-government-raised-the-minimum-",
+      "https://www.othernews.example/unrelated/the-dutch-government-raised-the-minimum-"
+    ]
+  },
+  {
+    "id": "recent_local-027-storm-poly-caused-widespread-rail-disrup",
+    "originalClaim": "Storm Poly caused widespread rail disruption in the Netherlands in July 2023.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/storm-poly-caused-widespread-rail-disrup",
+      "https://www.localnews.example/storm-poly-caused-widespread-rail-disrup"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/storm-poly-caused-widespread-rail-disrup",
+      "https://www.othernews.example/unrelated/storm-poly-caused-widespread-rail-disrup"
+    ]
+  },
+  {
+    "id": "recent_local-028-the-local-school-in-the-village-closed-d",
+    "originalClaim": "The local school in the village closed due to declining enrollment last year.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-local-school-in-the-village-closed-d",
+      "https://www.othernews.example/unrelated/the-local-school-in-the-village-closed-d"
+    ]
+  },
+  {
+    "id": "recent_local-029-a-regional-hospital-announced-an-emergen",
+    "originalClaim": "A regional hospital announced an emergency department closure in 2024.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.gov.example/press/a-regional-hospital-announced-an-emergen",
+      "https://www.localnews.example/a-regional-hospital-announced-an-emergen"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/a-regional-hospital-announced-an-emergen",
+      "https://www.othernews.example/unrelated/a-regional-hospital-announced-an-emergen"
+    ]
+  },
+  {
+    "id": "recent_local-030-the-city-installed-two-hundred-new-ev-ch",
+    "originalClaim": "The city installed two hundred new EV charging points in 2023.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-city-installed-two-hundred-new-ev-ch",
+      "https://www.localnews.example/the-city-installed-two-hundred-new-ev-ch"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-city-installed-two-hundred-new-ev-ch",
+      "https://www.othernews.example/unrelated/the-city-installed-two-hundred-new-ev-ch"
+    ]
+  },
+  {
+    "id": "recent_local-031-den-haag-introduceerde-een-milieuzone-vo",
+    "originalClaim": "Den Haag introduceerde een milieuzone voor oude dieselautos in 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/den-haag-introduceerde-een-milieuzone-vo",
+      "https://www.localnews.example/den-haag-introduceerde-een-milieuzone-vo"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/den-haag-introduceerde-een-milieuzone-vo",
+      "https://www.othernews.example/unrelated/den-haag-introduceerde-een-milieuzone-vo"
+    ]
+  },
+  {
+    "id": "recent_local-032-a-new-flood-barrier-was-completed-near-t",
+    "originalClaim": "A new flood barrier was completed near the coastal town in 2023.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/a-new-flood-barrier-was-completed-near-t",
+      "https://www.localnews.example/a-new-flood-barrier-was-completed-near-t"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/a-new-flood-barrier-was-completed-near-t",
+      "https://www.othernews.example/unrelated/a-new-flood-barrier-was-completed-near-t"
+    ]
+  },
+  {
+    "id": "recent_local-033-the-municipality-banned-fireworks-in-the",
+    "originalClaim": "The municipality banned fireworks in the city center for New Year 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-municipality-banned-fireworks-in-the",
+      "https://www.localnews.example/the-municipality-banned-fireworks-in-the"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-municipality-banned-fireworks-in-the",
+      "https://www.othernews.example/unrelated/the-municipality-banned-fireworks-in-the"
+    ]
+  },
+  {
+    "id": "recent_local-034-a-local-festival-drew-a-record-fifty-tho",
+    "originalClaim": "A local festival drew a record fifty thousand visitors this summer.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/a-local-festival-drew-a-record-fifty-tho",
+      "https://www.othernews.example/unrelated/a-local-festival-drew-a-record-fifty-tho"
+    ]
+  },
+  {
+    "id": "recent_local-035-the-province-approved-funding-for-a-new-",
+    "originalClaim": "The province approved funding for a new cycling bridge in 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-province-approved-funding-for-a-new-",
+      "https://www.localnews.example/the-province-approved-funding-for-a-new-"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-province-approved-funding-for-a-new-",
+      "https://www.othernews.example/unrelated/the-province-approved-funding-for-a-new-"
+    ]
+  },
+  {
+    "id": "recent_local-036-a-water-main-burst-flooded-several-stree",
+    "originalClaim": "A water main burst flooded several streets downtown last week.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.gov.example/press/a-water-main-burst-flooded-several-stree",
+      "https://www.localnews.example/a-water-main-burst-flooded-several-stree"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/a-water-main-burst-flooded-several-stree",
+      "https://www.othernews.example/unrelated/a-water-main-burst-flooded-several-stree"
+    ]
+  },
+  {
+    "id": "recent_local-037-the-regional-airport-added-three-new-int",
+    "originalClaim": "The regional airport added three new international routes in 2023.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-regional-airport-added-three-new-int",
+      "https://www.localnews.example/the-regional-airport-added-three-new-int"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-regional-airport-added-three-new-int",
+      "https://www.othernews.example/unrelated/the-regional-airport-added-three-new-int"
+    ]
+  },
+  {
+    "id": "recent_local-038-de-ns-schrapte-enkele-nachttreinen-op-di",
+    "originalClaim": "De NS schrapte enkele nachttreinen op dit traject in 2024.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/de-ns-schrapte-enkele-nachttreinen-op-di",
+      "https://www.localnews.example/de-ns-schrapte-enkele-nachttreinen-op-di"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/de-ns-schrapte-enkele-nachttreinen-op-di",
+      "https://www.othernews.example/unrelated/de-ns-schrapte-enkele-nachttreinen-op-di"
+    ]
+  },
+  {
+    "id": "recent_local-039-the-town-hall-switched-entirely-to-solar",
+    "originalClaim": "The town hall switched entirely to solar power in 2023.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-town-hall-switched-entirely-to-solar",
+      "https://www.localnews.example/the-town-hall-switched-entirely-to-solar"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-town-hall-switched-entirely-to-solar",
+      "https://www.othernews.example/unrelated/the-town-hall-switched-entirely-to-solar"
+    ]
+  },
+  {
+    "id": "recent_local-040-a-new-public-library-branch-opened-in-th",
+    "originalClaim": "A new public library branch opened in the eastern district this year.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/a-new-public-library-branch-opened-in-th",
+      "https://www.othernews.example/unrelated/a-new-public-library-branch-opened-in-th"
+    ]
+  },
+  {
+    "id": "recent_local-041-the-city-reported-a-drop-in-bicycle-thef",
+    "originalClaim": "The city reported a drop in bicycle thefts after installing guarded racks.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "recent_local",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.gov.example/press/the-city-reported-a-drop-in-bicycle-thef",
+      "https://www.localnews.example/the-city-reported-a-drop-in-bicycle-thef"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/the-city-reported-a-drop-in-bicycle-thef",
+      "https://www.othernews.example/unrelated/the-city-reported-a-drop-in-bicycle-thef"
+    ]
+  },
+  {
+    "id": "recent_local-042-roadworks-on-the-ring-road-will-continue",
+    "originalClaim": "Roadworks on the ring road will continue through the end of 2024.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "recent_local",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.gov.example/press/roadworks-on-the-ring-road-will-continue",
+      "https://www.localnews.example/roadworks-on-the-ring-road-will-continue"
+    ],
+    "unacceptableUrls": [
+      "https://socialmedia.example/post/roadworks-on-the-ring-road-will-continue",
+      "https://www.othernews.example/unrelated/roadworks-on-the-ring-road-will-continue"
+    ]
+  },
+  {
+    "id": "mundane_factual-043-water-boils-at-one-hundred-degrees-celsi",
+    "originalClaim": "Water boils at one hundred degrees Celsius at sea level.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/water-boils-at-one-hundred-degrees-celsi",
+      "https://www.primary.example/water-boils-at-one-hundred-degrees-celsi"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/water-boils-at-one-hundred-degrees-celsi",
+      "https://blog.example/musings/water-boils-at-one-hundred-degrees-celsi"
+    ]
+  },
+  {
+    "id": "mundane_factual-044-the-earth-completes-one-orbit-around-the",
+    "originalClaim": "The Earth completes one orbit around the Sun in about 365 days.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-earth-completes-one-orbit-around-the",
+      "https://www.primary.example/the-earth-completes-one-orbit-around-the"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-earth-completes-one-orbit-around-the",
+      "https://blog.example/musings/the-earth-completes-one-orbit-around-the"
+    ]
+  },
+  {
+    "id": "mundane_factual-045-mount-everest-is-the-highest-mountain-ab",
+    "originalClaim": "Mount Everest is the highest mountain above sea level on Earth.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/mount-everest-is-the-highest-mountain-ab",
+      "https://www.primary.example/mount-everest-is-the-highest-mountain-ab"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/mount-everest-is-the-highest-mountain-ab",
+      "https://blog.example/musings/mount-everest-is-the-highest-mountain-ab"
+    ]
+  },
+  {
+    "id": "mundane_factual-046-the-human-heart-has-four-chambers",
+    "originalClaim": "The human heart has four chambers.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-human-heart-has-four-chambers",
+      "https://www.primary.example/the-human-heart-has-four-chambers"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-human-heart-has-four-chambers",
+      "https://blog.example/musings/the-human-heart-has-four-chambers"
+    ]
+  },
+  {
+    "id": "mundane_factual-047-paris-is-the-capital-city-of-france",
+    "originalClaim": "Paris is the capital city of France.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/paris-is-the-capital-city-of-france",
+      "https://www.primary.example/paris-is-the-capital-city-of-france"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/paris-is-the-capital-city-of-france",
+      "https://blog.example/musings/paris-is-the-capital-city-of-france"
+    ]
+  },
+  {
+    "id": "mundane_factual-048-the-speed-of-light-in-a-vacuum-is-about-",
+    "originalClaim": "The speed of light in a vacuum is about 300,000 kilometers per second.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-speed-of-light-in-a-vacuum-is-about-",
+      "https://www.primary.example/the-speed-of-light-in-a-vacuum-is-about-"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-speed-of-light-in-a-vacuum-is-about-",
+      "https://blog.example/musings/the-speed-of-light-in-a-vacuum-is-about-"
+    ]
+  },
+  {
+    "id": "mundane_factual-049-the-netherlands-has-twelve-provinces",
+    "originalClaim": "The Netherlands has twelve provinces.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-netherlands-has-twelve-provinces",
+      "https://www.primary.example/the-netherlands-has-twelve-provinces"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-netherlands-has-twelve-provinces",
+      "https://blog.example/musings/the-netherlands-has-twelve-provinces"
+    ]
+  },
+  {
+    "id": "mundane_factual-050-water-bestaat-uit-waterstof-en-zuurstof",
+    "originalClaim": "Water bestaat uit waterstof en zuurstof.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/water-bestaat-uit-waterstof-en-zuurstof",
+      "https://www.primary.example/water-bestaat-uit-waterstof-en-zuurstof"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/water-bestaat-uit-waterstof-en-zuurstof",
+      "https://blog.example/musings/water-bestaat-uit-waterstof-en-zuurstof"
+    ]
+  },
+  {
+    "id": "mundane_factual-051-amsterdam-is-de-hoofdstad-van-nederland",
+    "originalClaim": "Amsterdam is de hoofdstad van Nederland.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/amsterdam-is-de-hoofdstad-van-nederland",
+      "https://www.primary.example/amsterdam-is-de-hoofdstad-van-nederland"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/amsterdam-is-de-hoofdstad-van-nederland",
+      "https://blog.example/musings/amsterdam-is-de-hoofdstad-van-nederland"
+    ]
+  },
+  {
+    "id": "mundane_factual-052-the-pacific-ocean-is-the-largest-ocean-o",
+    "originalClaim": "The Pacific Ocean is the largest ocean on Earth.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-pacific-ocean-is-the-largest-ocean-o",
+      "https://www.primary.example/the-pacific-ocean-is-the-largest-ocean-o"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-pacific-ocean-is-the-largest-ocean-o",
+      "https://blog.example/musings/the-pacific-ocean-is-the-largest-ocean-o"
+    ]
+  },
+  {
+    "id": "mundane_factual-053-honey-does-not-spoil-if-stored-properly",
+    "originalClaim": "Honey does not spoil if stored properly.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/honey-does-not-spoil-if-stored-properly",
+      "https://www.primary.example/honey-does-not-spoil-if-stored-properly"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/honey-does-not-spoil-if-stored-properly",
+      "https://blog.example/musings/honey-does-not-spoil-if-stored-properly"
+    ]
+  },
+  {
+    "id": "mundane_factual-054-the-adult-human-body-has-206-bones",
+    "originalClaim": "The adult human body has 206 bones.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-adult-human-body-has-206-bones",
+      "https://www.primary.example/the-adult-human-body-has-206-bones"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-adult-human-body-has-206-bones",
+      "https://blog.example/musings/the-adult-human-body-has-206-bones"
+    ]
+  },
+  {
+    "id": "mundane_factual-055-sound-travels-faster-in-water-than-in-ai",
+    "originalClaim": "Sound travels faster in water than in air.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/sound-travels-faster-in-water-than-in-ai",
+      "https://www.primary.example/sound-travels-faster-in-water-than-in-ai"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/sound-travels-faster-in-water-than-in-ai",
+      "https://blog.example/musings/sound-travels-faster-in-water-than-in-ai"
+    ]
+  },
+  {
+    "id": "mundane_factual-056-the-freezing-point-of-water-is-zero-degr",
+    "originalClaim": "The freezing point of water is zero degrees Celsius at sea level.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-freezing-point-of-water-is-zero-degr",
+      "https://www.primary.example/the-freezing-point-of-water-is-zero-degr"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-freezing-point-of-water-is-zero-degr",
+      "https://blog.example/musings/the-freezing-point-of-water-is-zero-degr"
+    ]
+  },
+  {
+    "id": "mundane_factual-057-a-leap-year-occurs-every-four-years-with",
+    "originalClaim": "A leap year occurs every four years with century exceptions.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/a-leap-year-occurs-every-four-years-with",
+      "https://www.primary.example/a-leap-year-occurs-every-four-years-with"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/a-leap-year-occurs-every-four-years-with",
+      "https://blog.example/musings/a-leap-year-occurs-every-four-years-with"
+    ]
+  },
+  {
+    "id": "mundane_factual-058-the-sahara-is-the-largest-hot-desert-in-",
+    "originalClaim": "The Sahara is the largest hot desert in the world.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-sahara-is-the-largest-hot-desert-in-",
+      "https://www.primary.example/the-sahara-is-the-largest-hot-desert-in-"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-sahara-is-the-largest-hot-desert-in-",
+      "https://blog.example/musings/the-sahara-is-the-largest-hot-desert-in-"
+    ]
+  },
+  {
+    "id": "mundane_factual-059-dna-carries-the-genetic-instructions-of-",
+    "originalClaim": "DNA carries the genetic instructions of living organisms.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/dna-carries-the-genetic-instructions-of-",
+      "https://www.primary.example/dna-carries-the-genetic-instructions-of-"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/dna-carries-the-genetic-instructions-of-",
+      "https://blog.example/musings/dna-carries-the-genetic-instructions-of-"
+    ]
+  },
+  {
+    "id": "mundane_factual-060-the-amazon-is-the-largest-tropical-rainf",
+    "originalClaim": "The Amazon is the largest tropical rainforest on Earth.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-amazon-is-the-largest-tropical-rainf",
+      "https://www.primary.example/the-amazon-is-the-largest-tropical-rainf"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-amazon-is-the-largest-tropical-rainf",
+      "https://blog.example/musings/the-amazon-is-the-largest-tropical-rainf"
+    ]
+  },
+  {
+    "id": "mundane_factual-061-photosynthesis-converts-sunlight-into-ch",
+    "originalClaim": "Photosynthesis converts sunlight into chemical energy in plants.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/photosynthesis-converts-sunlight-into-ch",
+      "https://www.primary.example/photosynthesis-converts-sunlight-into-ch"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/photosynthesis-converts-sunlight-into-ch",
+      "https://blog.example/musings/photosynthesis-converts-sunlight-into-ch"
+    ]
+  },
+  {
+    "id": "mundane_factual-062-the-great-barrier-reef-is-located-off-th",
+    "originalClaim": "The Great Barrier Reef is located off the coast of Australia.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-great-barrier-reef-is-located-off-th",
+      "https://www.primary.example/the-great-barrier-reef-is-located-off-th"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-great-barrier-reef-is-located-off-th",
+      "https://blog.example/musings/the-great-barrier-reef-is-located-off-th"
+    ]
+  },
+  {
+    "id": "mundane_factual-063-iron-rusts-when-exposed-to-oxygen-and-mo",
+    "originalClaim": "Iron rusts when exposed to oxygen and moisture.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/iron-rusts-when-exposed-to-oxygen-and-mo",
+      "https://www.primary.example/iron-rusts-when-exposed-to-oxygen-and-mo"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/iron-rusts-when-exposed-to-oxygen-and-mo",
+      "https://blog.example/musings/iron-rusts-when-exposed-to-oxygen-and-mo"
+    ]
+  },
+  {
+    "id": "mundane_factual-064-the-euro-is-the-official-currency-of-the",
+    "originalClaim": "The euro is the official currency of the Netherlands.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-euro-is-the-official-currency-of-the",
+      "https://www.primary.example/the-euro-is-the-official-currency-of-the"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-euro-is-the-official-currency-of-the",
+      "https://blog.example/musings/the-euro-is-the-official-currency-of-the"
+    ]
+  },
+  {
+    "id": "mundane_factual-065-a-triangle-has-three-sides-and-three-ang",
+    "originalClaim": "A triangle has three sides and three angles.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/a-triangle-has-three-sides-and-three-ang",
+      "https://www.primary.example/a-triangle-has-three-sides-and-three-ang"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/a-triangle-has-three-sides-and-three-ang",
+      "https://blog.example/musings/a-triangle-has-three-sides-and-three-ang"
+    ]
+  },
+  {
+    "id": "mundane_factual-066-whales-are-mammals-not-fish",
+    "originalClaim": "Whales are mammals, not fish.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/whales-are-mammals-not-fish",
+      "https://www.primary.example/whales-are-mammals-not-fish"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/whales-are-mammals-not-fish",
+      "https://blog.example/musings/whales-are-mammals-not-fish"
+    ]
+  },
+  {
+    "id": "mundane_factual-067-the-boiling-point-of-water-decreases-at-",
+    "originalClaim": "The boiling point of water decreases at higher altitudes.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_primary_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/the-boiling-point-of-water-decreases-at-",
+      "https://www.primary.example/the-boiling-point-of-water-decreases-at-"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/the-boiling-point-of-water-decreases-at-",
+      "https://blog.example/musings/the-boiling-point-of-water-decreases-at-"
+    ]
+  },
+  {
+    "id": "mundane_factual-068-het-menselijk-lichaam-bestaat-voor-het-g",
+    "originalClaim": "Het menselijk lichaam bestaat voor het grootste deel uit water.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/het-menselijk-lichaam-bestaat-voor-het-g",
+      "https://www.primary.example/het-menselijk-lichaam-bestaat-voor-het-g"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/het-menselijk-lichaam-bestaat-voor-het-g",
+      "https://blog.example/musings/het-menselijk-lichaam-bestaat-voor-het-g"
+    ]
+  },
+  {
+    "id": "mundane_factual-069-antarctica-is-the-coldest-continent-on-e",
+    "originalClaim": "Antarctica is the coldest continent on Earth.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/antarctica-is-the-coldest-continent-on-e",
+      "https://www.primary.example/antarctica-is-the-coldest-continent-on-e"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/antarctica-is-the-coldest-continent-on-e",
+      "https://blog.example/musings/antarctica-is-the-coldest-continent-on-e"
+    ]
+  },
+  {
+    "id": "mundane_factual-070-the-nile-is-one-of-the-longest-rivers-in",
+    "originalClaim": "The Nile is one of the longest rivers in the world.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://quiz.example/the-nile-is-one-of-the-longest-rivers-in",
+      "https://blog.example/musings/the-nile-is-one-of-the-longest-rivers-in"
+    ]
+  },
+  {
+    "id": "mundane_factual-071-glass-is-made-primarily-from-sand",
+    "originalClaim": "Glass is made primarily from sand.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "no_sufficient_evidence",
+    "acceptableUrls": [],
+    "unacceptableUrls": [
+      "https://quiz.example/glass-is-made-primarily-from-sand",
+      "https://blog.example/musings/glass-is-made-primarily-from-sand"
+    ]
+  },
+  {
+    "id": "mundane_factual-072-bees-play-a-key-role-in-pollinating-many",
+    "originalClaim": "Bees play a key role in pollinating many crops.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "mundane_factual",
+    "idealOutcome": "matched_institutional_source",
+    "acceptableUrls": [
+      "https://www.encyclopedia.example/bees-play-a-key-role-in-pollinating-many",
+      "https://www.primary.example/bees-play-a-key-role-in-pollinating-many"
+    ],
+    "unacceptableUrls": [
+      "https://quiz.example/bees-play-a-key-role-in-pollinating-many",
+      "https://blog.example/musings/bees-play-a-key-role-in-pollinating-many"
+    ]
+  },
+  {
+    "id": "other-073-this-is-the-best-movie-ever-made",
+    "originalClaim": "This is the best movie ever made.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-074-the-government-should-lower-taxes-next-y",
+    "originalClaim": "The government should lower taxes next year.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-075-stock-prices-will-definitely-double-with",
+    "originalClaim": "Stock prices will definitely double within five years.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-076-modern-art-is-just-lazy-and-meaningless",
+    "originalClaim": "Modern art is just lazy and meaningless.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-077-everyone-would-be-happier-living-in-the-",
+    "originalClaim": "Everyone would be happier living in the countryside.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-078-dit-restaurant-heeft-het-lekkerste-eten-",
+    "originalClaim": "Dit restaurant heeft het lekkerste eten van de stad.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-079-de-economie-zal-volgend-jaar-zeker-insto",
+    "originalClaim": "De economie zal volgend jaar zeker instorten.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-080-klassieke-muziek-is-veel-mooier-dan-mode",
+    "originalClaim": "Klassieke muziek is veel mooier dan moderne pop.",
+    "sourceKind": "article",
+    "language": "nl",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-081-artificial-intelligence-will-replace-mos",
+    "originalClaim": "Artificial intelligence will replace most jobs by next decade.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-082-the-new-policy-is-morally-wrong-and-shou",
+    "originalClaim": "The new policy is morally wrong and should be reversed.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-083-cities-are-becoming-more-crowded-than-ru",
+    "originalClaim": "Cities are becoming more crowded than rural areas overall.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.report.example/context/cities-are-becoming-more-crowded-than-ru"
+    ],
+    "unacceptableUrls": [
+      "https://opinion.example/cities-are-becoming-more-crowded-than-ru"
+    ]
+  },
+  {
+    "id": "other-084-renewable-energy-adoption-has-been-risin",
+    "originalClaim": "Renewable energy adoption has been rising in recent years.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.report.example/context/renewable-energy-adoption-has-been-risin"
+    ],
+    "unacceptableUrls": [
+      "https://opinion.example/renewable-energy-adoption-has-been-risin"
+    ]
+  },
+  {
+    "id": "other-085-remote-work-has-changed-how-offices-are-",
+    "originalClaim": "Remote work has changed how offices are used.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.report.example/context/remote-work-has-changed-how-offices-are-"
+    ],
+    "unacceptableUrls": [
+      "https://opinion.example/remote-work-has-changed-how-offices-are-"
+    ]
+  },
+  {
+    "id": "other-086-public-transport-ridership-patterns-shif",
+    "originalClaim": "Public transport ridership patterns shifted after the pandemic.",
+    "sourceKind": "video",
+    "language": "nl",
+    "category": "other",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.report.example/context/public-transport-ridership-patterns-shif"
+    ],
+    "unacceptableUrls": [
+      "https://opinion.example/public-transport-ridership-patterns-shif"
+    ]
+  },
+  {
+    "id": "other-087-streaming-has-reshaped-how-people-consum",
+    "originalClaim": "Streaming has reshaped how people consume music.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "relevant_context_only",
+    "acceptableUrls": [
+      "https://www.report.example/context/streaming-has-reshaped-how-people-consum"
+    ],
+    "unacceptableUrls": [
+      "https://opinion.example/streaming-has-reshaped-how-people-consum"
+    ]
+  },
+  {
+    "id": "other-088-why-does-nobody-care-about-local-journal",
+    "originalClaim": "Why does nobody care about local journalism anymore?",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-089-imagine-a-world-without-traffic-jams",
+    "originalClaim": "Imagine a world without traffic jams.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-090-things-were-simply-better-in-the-old-day",
+    "originalClaim": "Things were simply better in the old days.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-091-he-is-clearly-the-greatest-athlete-of-hi",
+    "originalClaim": "He is clearly the greatest athlete of his generation.",
+    "sourceKind": "article",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  },
+  {
+    "id": "other-092-we-should-all-just-be-kinder-to-each-oth",
+    "originalClaim": "We should all just be kinder to each other.",
+    "sourceKind": "video",
+    "language": "en",
+    "category": "other",
+    "idealOutcome": "not_fact_checkable",
+    "acceptableUrls": [],
+    "unacceptableUrls": []
+  }
+]

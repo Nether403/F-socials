@@ -4,6 +4,8 @@ Welcome to the comprehensive design system and UX specification repository for *
 
 This project delivers a complete, high-fidelity design framework and documentation to align strategy, design, and development teams around a unified product vision.
 
+> **Implementation status:** these are the design deliverables. The product they describe is **built** — a live React app and analysis engine (see `../app/` and `../f-Socials-debt-and-todo.md`). When building UI, drive it from the live backend report contract, not the prototype's mock shape. Roadmap and sequencing: `../f-Socials-roadmap.md`.
+
 ---
 
 ## Deliverables Directory
@@ -18,7 +20,7 @@ All design assets and documents are organized within this repository:
   * Audience Segmentation Strategy
 * **[UX Guidelines (ux/guidelines.md)](file:///C:/Users/van_d/Documents/antigravity/mysterious-oppenheimer/ux/guidelines.md)**
   * Core Design Principles ("A lens, not a judge")
-  * Accessibility Guidelines (WCAG 2.1 AA checklist, contrast guidelines, touch targets)
+  * Accessibility Guidelines (WCAG 2.2 AA checklist, contrast guidelines, touch targets)
   * Responsive Design Breakpoints & Layout Rules
   * Interaction Patterns (gestures, micro-interactions, feedback loops)
   * Content Style Guide (tone of voice, placeholder standards)

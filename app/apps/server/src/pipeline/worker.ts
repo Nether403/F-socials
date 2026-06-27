@@ -5,6 +5,7 @@ import type { Providers } from '../providers/types';
 import type { Cache, Job, Repository } from '../infra/ports';
 import type { AnalysisReport } from '../types';
 import { runPipeline } from './stages';
+import { assertInvariantGateIntact } from '../router/guard';
 
 function shortSlug(): string {
   return randomUUID().replace(/-/g, '').slice(0, 10);
@@ -16,6 +17,11 @@ export function makeWorker(deps: {
   providers: Providers;
   meta: { model: string; analysisVersion: string; sourcePolicyVersion: string };
 }) {
+  // Boot guard (Req 9.2): verify the invariant gate (core/assemble.ts) still holds
+  // its pinned behavior before accepting any job. A weakened gate throws here, so the
+  // worker refuses to start rather than serving unguarded reports.
+  assertInvariantGateIntact();
+
   return async function handleJob(job: Job): Promise<void> {
     const existing = await deps.repo.getReport(job.reportId);
     if (!existing) {
@@ -57,6 +63,17 @@ export function makeWorker(deps: {
       await deps.repo.saveReport(finished);
       console.log(`[worker] ${job.reportId} -> ${finished.status}` +
         (finished.reasons?.length ? ` (${finished.reasons.join('; ')})` : ''));
+
+      // Persist per-claim audit records (Req 6.1). Best-effort: saveAuditRecord swallows
+      // its own errors, but we also guard the loop so an audit-persistence failure — or a
+      // no_sufficient_evidence claim — can never fail an otherwise-ready report (Req 7.3).
+      try {
+        for (const record of result.audits) {
+          await deps.repo.saveAuditRecord(job.reportId, record);
+        }
+      } catch (auditErr) {
+        console.error(`[worker] ${job.reportId} audit persistence failed (non-fatal):`, auditErr);
+      }
 
       // Only cache servable reports so we never serve a stale 'needs_review' as final.
       if (finished.status === 'ready') {

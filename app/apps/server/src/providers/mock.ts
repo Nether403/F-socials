@@ -11,6 +11,8 @@ import type {
   TranscriptProvider,
 } from './types';
 import type { RawInput } from '../types';
+import { seededNormalizer } from '../router/normalize';
+import { seededValidator } from '../router/validate';
 
 export const passthroughTranscript: TranscriptProvider = {
   async fetch(input: RawInput): Promise<Transcript> {
@@ -110,3 +112,12 @@ export const mockPerspective: PerspectiveProvider = {
     ];
   },
 };
+
+// ponytail: the offline Claim_Verification_Router mocks ARE the seeded, deterministic
+// normalizer/validator from src/router/ (tasks 2.1 / 5.1) — reused here rather than
+// re-implemented so the offline pipeline runs the same logic the property tests pin and
+// there is a single source of truth. Both are pure functions of their input (the
+// validator hashes original-claim + candidate), so the zero-API-key path is fully
+// deterministic. Real LLM-backed providers swap in behind the same interfaces.
+export const mockNormalizer = seededNormalizer;
+export const mockValidator = seededValidator;

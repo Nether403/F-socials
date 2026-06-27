@@ -5,7 +5,8 @@ import { Router, type Request, type Response } from 'express';
 import type { Cache, Queue, RateLimiter, Repository } from '../infra/ports';
 import type { AnalysisReport, ContentItem, RawInput } from '../types';
 import { cacheKey } from '../core/hash';
-import { submitSchema } from './validation';
+import { policyDescriptor } from '../core/sourceTier';
+import { submitSchema, disputeSchema, flagSchema } from './validation';
 import { requireAuth } from './auth';
 
 export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter }): Router {
@@ -104,6 +105,63 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     const report = await deps.repo.getReport(id);
     if (!report) return res.status(404).json({ error: 'not_found' });
     return res.json({ reportId: report.id, status: report.status, reasons: report.reasons });
+  });
+
+  // POST /api/v1/analyses/:id/disputes — PUBLIC anonymous dispute (no auth). A
+  // dispute is persisted with NO user id so anyone can challenge a report (3.1, 3.2).
+  router.post('/analyses/:id/disputes', async (req: Request, res: Response) => {
+    const id = paramId(req);
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const report = await deps.repo.getReport(id);
+    if (!report) return res.status(404).json({ error: 'not_found' }); // 3.6
+    const parsed = disputeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() }); // 3.7
+    }
+    await deps.repo.createDispute({
+      id: randomUUID(),
+      reportId: id,
+      claimId: parsed.data.claimId,
+      reason: parsed.data.reason,
+      createdAt: new Date().toISOString(),
+    });
+    return res.status(201).json({ ok: true });
+  });
+
+  // POST /api/v1/analyses/:id/flags — AUTHENTICATED technique flag. requireAuth
+  // rejects anonymous callers (3.3, 3.4); a flag is bound to report + user and
+  // must name a technique the report actually surfaced (3.5, 3.6, 3.7).
+  router.post('/analyses/:id/flags', requireAuth, async (req: Request, res: Response) => {
+    const id = paramId(req);
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const report = await deps.repo.getReport(id);
+    if (!report) return res.status(404).json({ error: 'not_found' }); // 3.6
+    const parsed = flagSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() }); // 3.7
+    }
+    const techniques = new Set(report.framingSignals.map((fs) => fs.technique));
+    if (!techniques.has(parsed.data.technique)) {
+      // 3.7 — can't flag a technique the report never raised.
+      return res
+        .status(400)
+        .json({ error: 'invalid_technique', details: { allowed: [...techniques] } });
+    }
+    await deps.repo.createFlag({
+      id: randomUUID(),
+      reportId: id,
+      userId: req.user!.id,
+      technique: parsed.data.technique,
+      note: parsed.data.note,
+      createdAt: new Date().toISOString(),
+    });
+    return res.status(201).json({ ok: true });
+  });
+
+  // GET /api/v1/policy — PUBLIC source-tier policy descriptor (no auth). Powers
+  // the methodology page so the tiering rules are inspectable (1.6, 2.5).
+  router.get('/policy', (_req: Request, res: Response) => {
+    return res.json(policyDescriptor());
   });
 
   // GET /api/v1/r/:slug — PUBLIC read-only shared report (no auth required).

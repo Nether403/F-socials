@@ -3,6 +3,8 @@
 Adjusted to **your** chosen stack. Status legend:
 ✅ decided / have account · 🔑 need to generate key · 🔎 still evaluating · ⏳ deferred to later phase
 
+> **Update:** Phases 0–2 are largely **wired and verified** (Gemini, Supadata, Firecrawl, Fact Check → GDELT → Tavily, bridging, Neon, Upstash, Supabase auth). The live build state is in `f-Socials-debt-and-todo.md`; what to do next is in `f-Socials-roadmap.md`. This list remains the reference for accounts, keys, and the swap table.
+
 > The scaffolded first slice runs with **zero external accounts** (mock providers + in-memory infra). The `.env.example` is now pre-populated with every key below, so you can fill it in one pass and the swap-in work later is just "implement the interface + flip the selector."
 
 ---

@@ -14,3 +14,17 @@ export const submitSchema = z
   });
 
 export type SubmitInput = z.infer<typeof submitSchema>;
+
+export const disputeSchema = z.object({
+  reason: z.string().min(1).max(2000),
+  claimId: z.string().max(200).optional(),
+});
+
+export type DisputeInput = z.infer<typeof disputeSchema>;
+
+export const flagSchema = z.object({
+  technique: z.string().min(1).max(200),
+  note: z.string().max(2000).optional(),
+});
+
+export type FlagInput = z.infer<typeof flagSchema>;

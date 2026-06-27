@@ -1,6 +1,6 @@
-// Apply db/migrations/001_init.sql to Neon. Uses the direct (unpooled) URL.
-// Run once: `node scripts/migrate.mjs`
-import { readFileSync } from 'node:fs';
+// Apply db/migrations/*.sql to Neon in filename order. Uses the direct
+// (unpooled) URL. Run: `node scripts/migrate.mjs`
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import pg from 'pg';
@@ -14,19 +14,30 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = readFileSync(resolve(here, '../db/migrations/001_init.sql'), 'utf8');
+const migrationsDir = resolve(here, '../db/migrations');
+const files = readdirSync(migrationsDir)
+  .filter((f) => f.endsWith('.sql'))
+  .sort(); // lexical order works for the zero-padded NNN_ prefix
+
 const client = new pg.Client({ connectionString: url });
 try {
   await client.connect();
-  await client.query(sql);
-  console.log('✓ migration 001_init.sql applied');
-} catch (e) {
-  if (/already exists/i.test(e.message)) {
-    console.log('• schema already present (', e.message.split('\n')[0], ')');
-  } else {
-    console.error('migration failed:', e.message);
-    process.exitCode = 1;
+  for (const file of files) {
+    const sql = readFileSync(resolve(migrationsDir, file), 'utf8');
+    try {
+      await client.query(sql);
+      console.log(`✓ migration ${file} applied`);
+    } catch (e) {
+      if (/already exists/i.test(e.message)) {
+        console.log(`• ${file} already present (`, e.message.split('\n')[0], ')');
+      } else {
+        throw e;
+      }
+    }
   }
+} catch (e) {
+  console.error('migration failed:', e.message);
+  process.exitCode = 1;
 } finally {
   await client.end();
 }

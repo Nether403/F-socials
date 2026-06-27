@@ -10,6 +10,10 @@ import type {
   EvidenceStrength,
   IssueFrame,
   PerspectiveLink,
+  ClaimType,
+  FactCheckability,
+  MatchType,
+  Candidate,
 } from '../types';
 
 export interface Transcript {
@@ -50,9 +54,34 @@ export interface PerspectiveProvider {
   find(topic: string): Promise<PerspectiveLink[]>;
 }
 
+// Claim_Verification_Router provider swap points. Both are LLM judgments in prod
+// and deterministic seeded mocks offline, keeping the router's orchestration pure.
+
+export interface ClaimNormalizer {
+  // Stage 1 of the router. LLM-backed in prod; deterministic mock offline.
+  normalize(originalClaim: string): Promise<{
+    canonicalClaim: string;
+    claimType: ClaimType;
+    factCheckability: FactCheckability;
+  }>;
+}
+
+export interface CandidateValidator {
+  // Classifies one Candidate against the ORIGINAL claim (not the query variant).
+  validate(
+    originalClaim: string,
+    candidate: Candidate,
+  ): Promise<{
+    matchType: MatchType;
+    matchConfidence: number; // 0..1 inclusive
+  }>;
+}
+
 export interface Providers {
   transcript: TranscriptProvider;
   llm: LLMProvider;
   evidence: EvidenceProvider;
   perspective: PerspectiveProvider;
+  normalizer: ClaimNormalizer;
+  validator: CandidateValidator;
 }

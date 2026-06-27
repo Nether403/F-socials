@@ -4,6 +4,8 @@
 
 > Status: concept blueprint (single source of truth)
 > Supersedes the scattered analyses in this folder. Synthesizes the deep-research report, the strategy blueprint, the refinement docs, and the original spec into one buildable direction.
+>
+> **Update:** this blueprint has been executed into `f-Socials-v1-product-definition.md` (spec) and the **Foundation-phase engine is now built and proven** (see `f-Socials-debt-and-todo.md`). Sequencing for what's left and what's next lives in `f-Socials-roadmap.md`. The §17 "next step" is done.
 
 ---
 

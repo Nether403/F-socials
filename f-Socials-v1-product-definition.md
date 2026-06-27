@@ -4,6 +4,8 @@
 
 > Compass: **f-Socials is a lens, not a judge.** Every decision below answers to that.
 > Scope: **paste link → inspect claims & framing → see credible alternatives → share report.** Nothing else ships in v1.
+>
+> **Status (build):** the Foundation engine in §2–§5 and §7 (steps 1–8) is **built and proven end-to-end** — real providers, durable infra, auth, rate limiting, the invariant gate, and a live report + share UI. Remaining v1 surfaces (methodology page, dispute/flag UI, expert review queue, accounts/save) are tracked in `f-Socials-debt-and-todo.md` and sequenced in `f-Socials-roadmap.md`.
 
 ---
 
@@ -35,7 +37,7 @@
 - ❌ No creator/channel ranking or reputation scoring.
 - ❌ No feed reading, reranking, or intervention.
 - ❌ No framing cue without inspectable evidence.
-- ❌ No claim shown without a citation.
+- ❌ No claim asserting an evidence strength it cannot cite. *(A claim with no external review is shown honestly as `evidenceStrength: none` with zero citations — that's a valid, transparent state, not a hidden one.)*
 - ❌ No partisan/ideology labels as verdicts.
 
 These are enforced in code (validation), not just policy. A report that violates any of these fails QA and is not served.
@@ -339,22 +341,29 @@ interface PerspectiveResult {
 
 ---
 
-## 8. The one runnable check (non-negotiable)
+## 8. The one runnable check (non-negotiable) — **implemented**
 
-A single test that fails if the core guarantee breaks: **no claim without a citation, no framing signal without evidence.** Run it against the assembly stage with a fixture report.
+A single test that fails if the core guarantee breaks: **no claim asserts an evidence strength it cannot cite, no framing signal without evidence.** Run against the assembly stage (`core/assemble.ts`) with fixture reports. Lives at `apps/server/test/invariant.test.ts` and is in the `npm test` suite.
 
 ```ts
 // invariant.test.ts — the smallest thing that fails if the lens becomes a judge
-test('a report cannot be served with an uncited claim or evidence-less framing signal', () => {
-  const assembled = assembleReport(fixtureWithUncitedClaim);
-  expect(assembled.status).toBe('needs_review');     // NOT 'ready'
+test('a report is held for review if a claim over-claims its evidence or a framing signal lacks evidence', () => {
+  // A claim asserting strength (weak/moderate/strong) with zero citations -> needs_review.
+  const assembled = assembleReport(fixtureWithOverclaimedClaim);
+  expect(assembled.status).toBe('needs_review');      // NOT 'ready'
 
   const ok = assembleReport(fixtureFullyCited);
   expect(ok.status).toBe('ready');
-  for (const c of ok.claims) expect(c.citations.length).toBeGreaterThan(0);
+  for (const c of ok.claims) {
+    // 'none' + zero citations is a VALID honest state; any other strength must cite.
+    if (c.evidenceStrength !== 'none') expect(c.citations.length).toBeGreaterThan(0);
+  }
   for (const f of ok.framingSignals) {
-    expect(f.evidenceSpan).toBeTruthy();
-    expect(f.sourceUrl).toBeTruthy();
+    expect(f.examples.length).toBeGreaterThan(0);
+    for (const e of f.examples) {
+      expect(e.text).toBeTruthy();          // the quote that triggered it
+      expect(e.explanation).toBeTruthy();   // why it's a framing signal
+    }
   }
 });
 ```

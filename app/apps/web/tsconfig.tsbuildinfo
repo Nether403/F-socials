@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/api/client.ts","./src/api/types.ts","./src/components/disputemodal.tsx","./src/components/methodology.test.tsx","./src/components/methodology.tsx","./src/components/methodology.unavailable.test.tsx","./src/components/report.tsx","./src/test/setup.ts"],"version":"5.9.3"}

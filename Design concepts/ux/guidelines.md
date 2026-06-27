@@ -29,9 +29,9 @@ This document outlines the core design principles, accessibility rules, responsi
 
 ---
 
-## 2. Accessibility Guidelines (WCAG 2.1 AA Compliance)
+## 2. Accessibility Guidelines (WCAG 2.2 AA Compliance)
 
-Every component must meet or exceed WCAG 2.1 AA requirements.
+Every component must meet or exceed WCAG 2.2 AA requirements. (2.2 is a superset of 2.1 — the criteria below still hold; 2.2 also adds focus-appearance, minimum target size (24×24px), and dragging-alternative criteria, which the 44×44px targets and visible focus rings here already satisfy.)
 
 ### Contrast Ratios
 * **Normal Text (<18pt)**: Must have a contrast ratio of at least **4.5:1** against the background.

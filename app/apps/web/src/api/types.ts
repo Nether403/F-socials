@@ -93,3 +93,9 @@ export interface AnalysisReport {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface PolicyDescriptor {
+  version: string;
+  tiers: { tier: SourceTier; label: string; meaning: string }[];
+  openSignals: { name: string; raises: SourceTier }[];
+}

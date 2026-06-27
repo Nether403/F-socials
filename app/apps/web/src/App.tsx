@@ -1,14 +1,47 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { detectInput, getReportBySlug, pollReport, submitAnalysis } from './api/client';
 import type { AnalysisReport } from './api/types';
 import { Report } from './components/Report';
+import { Methodology } from './components/Methodology';
 
 type View =
   | { kind: 'home' }
   | { kind: 'loading'; status: string }
   | { kind: 'report'; report: AnalysisReport; shared?: boolean }
+  | { kind: 'methodology' }
   | { kind: 'error'; message: string };
+
+// Render-time guard for the Methodology page (Requirement 1.12). If the page
+// throws while rendering, we show an unavailable banner instead of a blank app;
+// the reader's prior report view is retained in App state and restored via onBack.
+class MethodologyBoundary extends Component<
+  { onBack: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Methodology page failed to render', error, info);
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div>
+          <div className="banner error">
+            The methodology page is unavailable right now. Your report is still here.
+          </div>
+          <button className="btn btn-ghost" onClick={this.props.onBack}>
+            Back
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const EXAMPLES: { label: string; blurb: string; text: string }[] = [
   {
@@ -37,22 +70,33 @@ export default function App() {
   const [view, setView] = useState<View>({ kind: 'home' });
   const [stepIdx, setStepIdx] = useState(0);
   const stepTimer = useRef<number | undefined>(undefined);
+  // Track the live view so the hash handler (a stable closure) can read it, and
+  // remember the last report view to restore when the reader leaves Methodology (1.12).
+  const viewRef = useRef<View>(view);
+  viewRef.current = view;
+  const priorReportRef = useRef<View | null>(null);
+  // Remember the last attempted request so the error view's Retry can re-run it,
+  // whether the failure came from a fresh analysis (run) or a shared-report load (4.2).
+  const lastAttemptRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Shared report deep-link: #/r/<slug>
+  // Hash routing: shared report (#/r/<slug>) and the no-auth Methodology page (#/methodology).
   useEffect(() => {
     async function loadFromHash() {
-      const m = window.location.hash.match(/^#\/r\/([A-Za-z0-9]+)/);
-      if (!m) return;
-      setView({ kind: 'loading', status: 'loading shared report' });
-      try {
-        const report = await getReportBySlug(m[1]);
-        setView({ kind: 'report', report, shared: true });
-      } catch (e) {
-        setView({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      const hash = window.location.hash;
+      const shareMatch = hash.match(/^#\/r\/([A-Za-z0-9]+)/);
+      if (shareMatch) {
+        loadShared(shareMatch[1]);
+        return;
+      }
+      // #/methodology serves the Methodology page without authentication (1.1, 1.11).
+      if (/^#\/methodology\b/.test(hash)) {
+        if (viewRef.current.kind === 'report') priorReportRef.current = viewRef.current;
+        setView({ kind: 'methodology' });
+        return;
       }
     }
     loadFromHash();
@@ -60,9 +104,27 @@ export default function App() {
     return () => window.removeEventListener('hashchange', loadFromHash);
   }, []);
 
+  // Load a shared report by slug, recording the attempt so Retry can re-run it (4.2).
+  async function loadShared(slug: string) {
+    lastAttemptRef.current = () => loadShared(slug);
+    setView({ kind: 'loading', status: 'loading shared report' });
+    try {
+      const report = await getReportBySlug(slug);
+      setView({ kind: 'report', report, shared: true });
+    } catch (e) {
+      setView({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
   function goHome() {
     if (window.location.hash) window.location.hash = '';
     setView({ kind: 'home' });
+  }
+
+  // Leaving Methodology restores the reader's prior report context if there was one (1.12).
+  function leaveMethodology() {
+    if (window.location.hash) window.location.hash = '';
+    setView(priorReportRef.current ?? { kind: 'home' });
   }
 
   useEffect(() => {
@@ -79,6 +141,7 @@ export default function App() {
   async function run(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
+    lastAttemptRef.current = () => run(trimmed);
     setStepIdx(0);
     setView({ kind: 'loading', status: 'queued' });
     try {
@@ -127,15 +190,28 @@ export default function App() {
 
         {view.kind === 'error' && (
           <div>
-            <div className="banner error">{view.message}</div>
-            <button className="btn btn-ghost" onClick={goHome}>
-              Back
-            </button>
+            <div className="banner error" role="alert">{view.message}</div>
+            <div className="error-actions">
+              {lastAttemptRef.current && (
+                <button className="btn" onClick={() => lastAttemptRef.current?.()}>
+                  Retry
+                </button>
+              )}
+              <button className="btn btn-ghost" onClick={goHome}>
+                Back
+              </button>
+            </div>
           </div>
         )}
 
         {view.kind === 'report' && (
           <Report report={view.report} shared={view.shared} onBack={goHome} />
+        )}
+
+        {view.kind === 'methodology' && (
+          <MethodologyBoundary onBack={leaveMethodology}>
+            <Methodology onBack={leaveMethodology} />
+          </MethodologyBoundary>
         )}
       </div>
     </div>

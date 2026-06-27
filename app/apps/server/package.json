@@ -6,9 +6,12 @@
   "description": "f-Socials API + analysis worker (first slice).",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit && tsup src/index.ts src/worker.ts",
+    "start": "node dist/index.js",
+    "start:worker": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts"
+    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts test/config.test.ts test/cors.test.ts test/sourceTier.totality.test.ts test/sourceTier.signals.test.ts test/sourceSignals.provenance.test.ts test/gate.uncited.test.ts test/gate.honestNone.test.ts test/gate.framing.test.ts test/gate.readiness.test.ts test/gate.tierNeutral.test.ts test/servedTiers.test.ts test/dispute.persist.test.ts test/flag.persist.test.ts test/flag.unauth.test.ts test/missingReport.test.ts test/invalidBody.test.ts test/protectedRoutes.test.ts \"test/router/**/*.test.ts\"",
+    "test:build": "node --import tsx --test test/build.smoke.test.ts test/degraded.test.ts"
   },
   "dependencies": {
     "bullmq": "^5.79.1",
@@ -22,6 +25,8 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.20.0",
+    "fast-check": "^4.8.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
