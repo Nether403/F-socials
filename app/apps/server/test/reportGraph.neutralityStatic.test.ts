@@ -97,7 +97,7 @@ test('Req 9.1/9.3: normalized row types carry no creator-reliability dimension',
   // it declares no such field.
   const claimRowMatch = stripTsComments(full).match(/interface\s+ClaimRow\s*\{([\s\S]*?)\}/);
   assert.ok(claimRowMatch, 'ClaimRow interface should be present in types.ts');
-  const claimRowBody = claimRowMatch[1];
+  const claimRowBody = claimRowMatch[1] ?? '';
   assert.doesNotMatch(
     claimRowBody,
     /tier/i,
@@ -125,7 +125,7 @@ test('Req 7.4/9.1: migration 004 adds no creator-reliability column', () => {
 
   // A column-level guard: no ADD COLUMN names a creator/author/channel reliability column.
   const addColumns = [...ddl.matchAll(/add\s+column\s+(?:if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*)/gi)].map(
-    (m) => m[1],
+    (m) => m[1] ?? '',
   );
   for (const col of addColumns) {
     assert.doesNotMatch(

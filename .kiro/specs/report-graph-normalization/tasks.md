@@ -105,7 +105,7 @@ Non-negotiables enforced throughout: `core/assemble.ts` is never modified, param
     - **Property 6: Backfill populates JSONB-only reports, skips populated ones, never mutates JSONB**
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4**
 
-  - [-] 8.2 Write example test `test/reportGraph.backfillFailure.test.ts`
+  - [x] 8.2 Write example test `test/reportGraph.backfillFailure.test.ts`
     - Mix of good reports plus one that throws on write; assert good reports populated and failed `report_id` reported
     - _Requirements: 8.5_
 
@@ -139,16 +139,16 @@ Non-negotiables enforced throughout: `core/assemble.ts` is never modified, param
     - Force a failure mid-rewrite; assert the prior complete row set survives (no partial set observable)
     - _Requirements: 4.4_
 
-  - [-] 10.3 Write integration test `test/reportGraph.crossReport.test.ts`
+  - [ ] 10.3 Write integration test `test/reportGraph.crossReport.test.ts`
     - Seed several reports' rows; run `GROUP BY report_id` and group-by-source joins on the indexed columns; assert correct counts without reading `analysis_reports.data`
     - _Requirements: 11.1, 11.2_
 
 - [ ] 11. Wire tests into the suite and final checkpoint
-  - [~] 11.1 Add the new `test/*.test.ts` files to the `test` script file list in `app/apps/server/package.json`
+  - [ ] 11.1 Add the new `test/*.test.ts` files to the `test` script file list in `app/apps/server/package.json`
     - Include the property, example, and smoke tests; keep slow/DB-dependent integration tests grouped appropriately
     - _Requirements: 6.1_
 
-  - [~] 11.2 Final checkpoint - Ensure all tests pass
+  - [ ] 11.2 Final checkpoint - Ensure all tests pass
     - Run `npm test` + `npm run typecheck` in `apps/server`; ask the user if questions arise.
 
 ## Notes

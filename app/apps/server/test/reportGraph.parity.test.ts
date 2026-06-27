@@ -19,7 +19,7 @@ import { PostgresRepository } from '../src/infra/postgres';
 
 test('6.1: PostgresRepository implements the dual-write contract methods', () => {
   // Check the prototype to avoid constructing with a real pg Pool.
-  const proto = PostgresRepository.prototype as Record<string, unknown>;
+  const proto = PostgresRepository.prototype as unknown as Record<string, unknown>;
   assert.equal(typeof proto.hasReportGraph, 'function', 'PostgresRepository.hasReportGraph should exist');
   assert.equal(typeof proto.listReportIds, 'function', 'PostgresRepository.listReportIds should exist');
   // saveReport carries the dual-write guarantee — it must be present too.

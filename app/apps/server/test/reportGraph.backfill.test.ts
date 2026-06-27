@@ -61,9 +61,16 @@ test('Property 6: backfill populates JSONB-only reports, skips populated, never 
         });
 
         // Snapshot every report's JSONB payload before backfill, to prove the
-        // backfill never mutates analysis_reports.data (Req 8.4).
-        const jsonbBefore = new Map<string, AnalysisReport>();
-        for (const report of reports) jsonbBefore.set(report.id, structuredClone(report));
+        // backfill never mutates analysis_reports.data (Req 8.4). Compare the
+        // JSON-serialized payload — exactly what JSONB stores — so the check is
+        // insensitive to object prototypes. fast-check's record arbitraries emit
+        // null-prototype sub-objects (e.g. citations); structuredClone would
+        // normalize them to Object.prototype and trip a spurious prototype-only
+        // mismatch even though every field value is identical.
+        const jsonbBefore = new Map<string, string>();
+        for (const report of reports) {
+          jsonbBefore.set(report.id, JSON.stringify(await repo.getReport(report.id)));
+        }
 
         // ── First backfill run ──
         const summary = await backfill(repo);
@@ -96,7 +103,7 @@ test('Property 6: backfill populates JSONB-only reports, skips populated, never 
 
         // Req 8.4 — no report's JSONB payload was altered by the backfill.
         for (const id of byId.keys()) {
-          assert.deepEqual(await repo.getReport(id), jsonbBefore.get(id));
+          assert.equal(JSON.stringify(await repo.getReport(id)), jsonbBefore.get(id));
         }
 
         // ── Second backfill run: idempotent (Req 8.2) ──
