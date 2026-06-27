@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>f-Socials — UX/UI Design & Interactive Report Workspace</title>
+    
+    <!-- Inter Font and IBM Plex Mono for clean forensic & scientific editorial styling -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS for modern utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons for desaturated line iconography -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#070a12', // Clinical-grade deep graphite primary background
+                            900: '#101622', // Standard surface containers
+                            850: '#182132', // Slightly lifted card background
+                            800: '#202c42', // Active selections, hover outlines
+                            700: '#2e3e5c', // Subdued metadata text / thin dividers
+                            400: '#94a3b8', // Descriptive labels & paragraphs
+                        },
+                        cyan: {
+                            400: '#22d3ee', // Technical neutral accent color (highly desaturated)
+                            500: '#06b6d4',
+                            950: '#083344',
+                        },
+                        violet: {
+                            400: '#a78bfa', // Structural / Perspective highlight accent
+                            500: '#8b5cf6',
+                        },
+                        amber: {
+                            400: '#fbbf24', // ONLY caution color allowed, never bright/alarmist red
+                            950: '#451a03',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['IBM Plex Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        /* Custom scrollbars matching our calm visual guidelines */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #070a12;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #202c42;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2e3e5c;
+        }
+
+        /* Interactive Ethics Inspector Glowing Dotted Overlay */
+        .ethics-active .ethics-inspector-highlight {
+            border: 1.5px dashed #22d3ee !important;
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.12) !important;
+            position: relative;
+        }
+        
+        .ethics-active .ethics-inspector-highlight-violet {
+            border: 1.5px dashed #a78bfa !important;
+            box-shadow: 0 0 15px rgba(167, 139, 250, 0.12) !important;
+            position: relative;
+        }
+
+        .ethics-tooltip {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(5px);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .ethics-active .ethics-tooltip {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        /* Custom pulse animation for pipeline tracking */
+        @keyframes subtlePulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        .animate-subtle-pulse {
+            animation: subtlePulse 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased h-full flex flex-col selection:bg-cyan-500/20 selection:text-cyan-200">
+
+    <!-- Brand & Ethics Inspector Control Bar -->
+    <header class="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 lg:px-8 py-3 flex-none">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            <!-- Logo with technical subtitle -->
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                    <i data-lucide="binary" class="w-5 h-5 text-slate-950 stroke-[2.5]"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-lg tracking-tight">f-Socials</span>
+                        <span class="text-[10px] font-mono bg-slate-900 text-slate-400 border border-slate-800 px-1.5 py-0.5 rounded">v1.0-SPEC</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 font-mono">LENS, NOT A JUDGE</p>
+                </div>
+            </div>
+
+            <!-- Global Action Panel -->
+            <div class="flex items-center gap-3 bg-slate-900/60 p-1 rounded-xl border border-slate-800/80 w-full sm:w-auto justify-between sm:justify-start">
+                <button onclick="showIngestScreen()" id="btnNavIngest" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-850 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                    <span>Ingest URL</span>
+                </button>
+                <button onclick="showReportDirectly()" id="btnNavReport" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-850 text-slate-200 border border-slate-750 transition-all flex items-center gap-1.5">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                    <span>Mock Report</span>
+                </button>
+                
+                <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+                <!-- Ethics overlay toggle button -->
+                <button id="toggleEthicsInspector" onclick="toggleEthicsOverlay()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-950 hover:bg-slate-850 text-cyan-400 border border-slate-800 transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
+                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                    <span>Activate Ethics Inspector</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Scrollable Body area -->
+    <div class="flex-1 overflow-y-auto">
+
+        <!-- SCREEN 1: THE INGESTION HOME SCREEN -->
+        <section id="screen-ingest" class="max-w-4xl mx-auto px-6 py-12 lg:py-20 space-y-12 block">
+            
+            <!-- Hero Statement -->
+            <div class="text-center space-y-4">
+                <h1 class="text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+                    Inspect content, structure, and evidence.
+                </h1>
+                <p class="text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
+                    We do not issue truth ratings or stamp warnings. Paste an online resource below to read it through an objective contextual analysis lens.
+                </p>
+            </div>
+
+            <!-- Ingest Bar (Calm, devtools style) -->
+            <div class="bg-slate-900 border border-slate-800 p-2.5 rounded-2xl shadow-xl max-w-2xl mx-auto space-y-3">
+                <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                    <div class="relative flex-1">
+                        <i data-lucide="link" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
+                        <input id="inputMediaUrl" type="url" placeholder="Paste YouTube link, Article URL, or raw transcript text..." 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500/50 transition-colors font-mono placeholder:text-slate-600">
+                    </div>
+                    <button onclick="runIngestionPipeline()" class="px-5 py-3 bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-500/5 active:scale-95 shrink-0">
+                        <span>Analyze Content</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                
+                <!-- Quick Suggestion Targets -->
+                <div class="flex flex-wrap items-center gap-2 px-1 text-[11px] text-slate-500">
+                    <span class="font-mono">Quick sandbox demos:</span>
+                    <button onclick="selectDemoUrl('youtube.com/watch?v=grid2-transition-analysis')" class="hover:text-cyan-400 hover:underline font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800 transition-all">
+                        YouTube Grid Transition (Demo)
+                    </button>
+                    <button onclick="selectDemoUrl('nytimes.com/article/municipal-utility-dispute')" class="hover:text-cyan-400 hover:underline font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800 transition-all">
+                        News Article (Demo)
+                    </button>
+                </div>
+            </div>
+
+            <!-- One-Minute Onboarding Guidance -->
+            <div class="max-w-2xl mx-auto bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 space-y-4">
+                <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">
+                    <i data-lucide="shield-alert" class="w-4 h-4 text-cyan-400"></i>
+                    <span>The f-Socials UX Contract</span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div class="space-y-1.5 p-3.5 bg-slate-950 rounded-xl border border-slate-900">
+                        <h4 class="font-bold text-slate-200 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                            What we map
+                        </h4>
+                        <p class="text-slate-400 leading-relaxed">
+                            Factual and causal assertions matched against public registers, rhetorical techniques, missing context variables, and diverse academic perspectives.
+                        </p>
+                    </div>
+                    
+                    <div class="space-y-1.5 p-3.5 bg-slate-950 rounded-xl border border-slate-900">
+                        <h4 class="font-bold text-slate-200 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                            What we refuse
+                        </h4>
+                        <p class="text-slate-400 leading-relaxed">
+                            We completely refuse single "truth ratings", ideological labels, partisan left/right sliders, and visual warnings. We do not prosecute the creator.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- SCREEN 2: PIPELINE PROGRESS WORKSPACE -->
+        <section id="screen-loading" class="max-w-2xl mx-auto px-6 py-20 hidden">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-8 shadow-2xl">
+                
+                <!-- Pipeline Header -->
+                <div class="text-center space-y-2">
+                    <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-950/80 border border-cyan-500/20 text-cyan-400 mb-2">
+                        <i data-lucide="cpu" class="w-5 h-5 animate-spin"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-slate-200 font-sans">Processing Analysis Request</h2>
+                    <p class="text-xs text-slate-400 font-mono" id="pipeline-status-sub">HASH: 7f3b8... Cache Miss</p>
+                </div>
+
+                <!-- Live Pipeline Steps (No fake spinner: clinical updates) -->
+                <div class="space-y-4 font-mono text-xs">
+                    <!-- Step 1 -->
+                    <div id="step-1" class="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-850 text-slate-400">
+                        <div class="flex items-center gap-2.5">
+                            <i id="step-1-icon" data-lucide="circle-dot" class="w-4 h-4 text-cyan-400 animate-pulse"></i>
+                            <span id="step-1-text">Acquiring verified transcript tracks...</span>
+                        </div>
+                        <span id="step-1-status" class="text-cyan-400">Active</span>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div id="step-2" class="flex items-center justify-between p-3 rounded-lg bg-slate-950/40 border border-slate-900/60 text-slate-600">
+                        <div class="flex items-center gap-2.5">
+                            <i id="step-2-icon" data-lucide="circle" class="w-4 h-4"></i>
+                            <span id="step-2-text">Isolating individual factual & causal claims...</span>
+                        </div>
+                        <span id="step-2-status">Queued</span>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div id="step-3" class="flex items-center justify-between p-3 rounded-lg bg-slate-950/40 border border-slate-900/60 text-slate-600">
+                        <div class="flex items-center gap-2.5">
+                            <i id="step-3-icon" data-lucide="circle" class="w-4 h-4"></i>
+                            <span id="step-3-text">Verifying claim citations in Docket registries...</span>
+                        </div>
+                        <span id="step-3-status">Queued</span>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div id="step-4" class="flex items-center justify-between p-3 rounded-lg bg-slate-950/40 border border-slate-900/60 text-slate-600">
+                        <div class="flex items-center gap-2.5">
+                            <i id="step-4-icon" data-lucide="circle" class="w-4 h-4"></i>
+                            <span id="step-4-text">Mapping framing signals and sentiment spans...</span>
+                        </div>
+                        <span id="step-4-status">Queued</span>
+                    </div>
+
+                    <!-- Step 5 -->
+                    <div id="step-5" class="flex items-center justify-between p-3 rounded-lg bg-slate-950/40 border border-slate-900/60 text-slate-600">
+                        <div class="flex items-center gap-2.5">
+                            <i id="step-5-icon" data-lucide="circle" class="w-4 h-4"></i>
+                            <span id="step-5-text">Assembling credible bridging sources...</span>
+                        </div>
+                        <span id="step-5-status">Queued</span>
+                    </div>
+                </div>
+
+                <!-- Technical diagnostics console -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-1.5">
+                    <div class="text-[10px] uppercase tracking-wider text-slate-500 font-mono font-semibold flex items-center justify-between">
+                        <span>Console Output</span>
+                        <span class="animate-subtle-pulse text-cyan-400 font-bold">● Live Stream</span>
+                    </div>
+                    <div id="console-logs" class="font-mono text-[10px] text-slate-400 space-y-1 overflow-y-auto max-h-[100px]">
+                        <p class="text-slate-500">[INFO] Request received for YouTube ID: grid2-transition-analysis</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- SCREEN 3: THE MAIN REPORT PAGE (THE CORE PRODUCT) -->
+        <section id="screen-report" class="max-w-7xl mx-auto px-4 lg:px-8 py-8 hidden">
+            
+            <!-- Dismissible Navigation Notice Banner -->
+            <div id="inspectorNotice" class="mb-8 bg-slate-900/40 border border-cyan-500/20 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all">
+                <div class="flex gap-3">
+                    <div class="p-2 bg-cyan-950/50 rounded-lg text-cyan-400 border border-cyan-500/20">
+                        <i data-lucide="info" class="w-4 h-4"></i>
+                    </div>
+                    <div class="space-y-0.5">
+                        <h4 class="text-xs font-semibold text-slate-200">Interactive Blueprint Loaded</h4>
+                        <p class="text-[11px] text-slate-400 max-w-3xl leading-relaxed">
+                            This page demonstrates an objective, structural content analysis. Toggle the <strong class="text-cyan-400">UX Ethics Inspector</strong> at the top to display annotations explaining the visual psychology of our design components.
+                        </p>
+                    </div>
+                </div>
+                <button onclick="dismissNotice()" class="text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-850 rounded transition-colors self-end md:self-auto">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+
+            <!-- Two-column main workspace grid layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <!-- STICKY SIDE INDEX (Desktop Only) -->
+                <aside class="hidden lg:block lg:col-span-3 sticky top-20 space-y-6">
+                    <div class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4">
+                        <h3 class="text-[10px] font-mono font-semibold text-slate-500 uppercase tracking-widest px-3 mb-3">Report Structure</h3>
+                        <nav class="space-y-1 font-mono text-xs">
+                            <a href="#analyzed-content" class="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-all group">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400"></i>
+                                <span>01. Analyzed Content</span>
+                            </a>
+                            <a href="#claim-ledger" class="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-all group">
+                                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400"></i>
+                                <span>02. Claim Ledger</span>
+                            </a>
+                            <a href="#framing-signals" class="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-all group">
+                                <i data-lucide="scan-line" class="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400"></i>
+                                <span>03. Framing Signals</span>
+                            </a>
+                            <a href="#useful-context" class="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-all group">
+                                <i data-lucide="book-open" class="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400"></i>
+                                <span>04. Related Context</span>
+                            </a>
+                            <a href="#bridging-sources" class="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-all group">
+                                <i data-lucide="git-merge" class="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400"></i>
+                                <span>05. Bridging Sources</span>
+                            </a>
+                            <a href="#provenance-footer" class="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-all group">
+                                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400"></i>
+                                <span>06. Provenance Trace</span>
+                            </a>
+                        </nav>
+                    </div>
+
+                    <!-- Calm Policy Compact Card -->
+                    <div class="bg-slate-900/20 border border-slate-900 rounded-xl p-4 text-xs space-y-3">
+                        <div class="flex items-center gap-1.5 text-cyan-400 font-semibold font-mono text-[10px]">
+                            <i data-lucide="scale" class="w-3.5 h-3.5"></i>
+                            <span>The Advisory Paradigm</span>
+                        </div>
+                        <p class="text-slate-400 leading-relaxed">
+                            This report operates purely as an advisory context layer under the EU AI Act (Reg. 2024/1689). It is designed to foster agency and structured reflection.
+                        </p>
+                    </div>
+                </aside>
+
+                <!-- MAIN REPORT FLOW -->
+                <div class="col-span-1 lg:col-span-9 space-y-10">
+                    
+                    <!-- SECTION 1: ANALYZED CONTENT SUMMARY -->
+                    <section id="analyzed-content" class="scroll-mt-24 space-y-4">
+                        
+                        <!-- Content source tags & analytics -->
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full font-mono">
+                                <i data-lucide="youtube" class="w-3.5 h-3.5 text-red-400"></i>
+                                <span class="text-slate-200">YouTube Captions Ingest</span>
+                            </div>
+                            <span class="text-slate-700">|</span>
+                            <span>Processed June 26, 2026</span>
+                            <span class="text-slate-700">|</span>
+                            <div class="flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                                <span>14m 22s Duration</span>
+                            </div>
+                        </div>
+
+                        <!-- Report Main Titles -->
+                        <div class="space-y-2">
+                            <h1 id="report-main-title" class="text-2xl lg:text-3xl font-bold tracking-tight text-slate-100">
+                                The Grid 2.0 Transition: Municipal Autonomy vs. System Reliability Mandates
+                            </h1>
+                            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                                <span>Source Document:</span>
+                                <a href="#" class="text-cyan-400 hover:underline font-mono flex items-center gap-1 break-all bg-slate-900/40 px-2 py-0.5 rounded border border-slate-800">
+                                    youtube.com/watch?v=grid2-transition-analysis
+                                    <i data-lucide="external-link" class="w-3 h-3"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Provenance Pill Block (Ethical Overlay Target) -->
+                        <div class="ethics-inspector-highlight border border-transparent rounded-xl p-1 transition-all duration-300">
+                            
+                            <!-- Inside contents -->
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-[10px] font-mono bg-cyan-950/60 text-cyan-400 border border-cyan-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                                    <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+                                    AI-Generated
+                                </span>
+                                <span class="text-[10px] font-mono bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                                    <i data-lucide="bookmark-check" class="w-3.5 h-3.5"></i>
+                                    Primary Citations Attached
+                                </span>
+                                <span class="text-[10px] font-mono bg-slate-900 text-slate-400 border border-slate-800 px-2 py-1 rounded-lg">
+                                    Pipeline v1.0.4
+                                </span>
+                            </div>
+
+                            <!-- Interactive Ethics Tooltip Popover -->
+                            <div class="ethics-tooltip hidden bg-cyan-950/90 border border-cyan-500/30 text-cyan-200 p-4 rounded-xl space-y-1.5 mt-3 shadow-lg max-w-2xl">
+                                <div class="font-bold text-xs uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 font-mono">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    Provenance Pills Over Verdict Badges
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    Instead of prominent alarming fact-checking "badges" or absolute judgements that evoke cognitive defenses and trigger political alignment triggers, f-Socials features neutral, objective system metadata. This clarifies the origin of the analysis transparently.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- TLDR / Executive Abstract Container -->
+                        <div class="bg-gradient-to-r from-slate-900 to-slate-900/50 border-l-2 border-cyan-500 border-y border-r border-slate-800/80 rounded-r-xl p-5 space-y-2">
+                            <h3 class="text-[10px] font-semibold text-cyan-400 uppercase tracking-wider font-mono">Briefing Abstract (TLDR)</h3>
+                            <p class="text-xs leading-relaxed text-slate-300">
+                                The analyzed video argues that the federal "Grid 2.0 Initiative" acts as an unconstitutional usurpation of local power, leading inevitably to residential rate hikes. The report extracts the core factual assertions regarding public finances, cross-checks them against utility filing records, examines how narrative framing focuses emotional weight on rural vulnerability, and offers comparative, highly evidence-backed perspectives.
+                            </p>
+                        </div>
+                    </section>
+
+                    <hr class="border-slate-900">
+
+                    <!-- SECTION 2: THE CLAIM LEDGER -->
+                    <section id="claim-ledger" class="scroll-mt-24 space-y-6">
+                        
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="space-y-1">
+                                <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                                    <i data-lucide="file-spreadsheet" class="w-5 h-5 text-cyan-400"></i>
+                                    Claim Ledger
+                                </h2>
+                                <p class="text-xs text-slate-400">Isolated assertions of fact assessed systematically against primary evidence registers</p>
+                            </div>
+                            <span class="text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded self-start">
+                                3 Claims Isolated
+                            </span>
+                        </div>
+
+                        <!-- LEDGER CARD 1: SUPPORTED SOURCE BASIS -->
+                        <div class="bg-slate-900 border border-slate-800/80 hover:border-slate-700/80 rounded-xl overflow-hidden transition-all">
+                            <div class="p-5 space-y-4">
+                                
+                                <div class="flex flex-wrap items-center justify-between gap-2.5">
+                                    <div class="flex items-center gap-2 text-[10px] font-mono">
+                                        <span class="text-cyan-400">Assertion #1</span>
+                                        <span class="text-slate-600">·</span>
+                                        <span class="bg-slate-950 text-slate-300 px-2 py-0.5 rounded">Factual Claim</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="bg-slate-950 text-slate-400 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">Verifiable</span>
+                                        <span class="bg-cyan-950 text-cyan-400 border border-cyan-500/10 px-2 py-0.5 rounded text-[10px] font-mono">Supported by cited source</span>
+                                    </div>
+                                </div>
+
+                                <p class="text-sm font-medium text-slate-200 leading-relaxed font-sans">
+                                    "The upgrade mandate authorizes a state commission to override local municipal zoning for new high-voltage transmission pathways."
+                                </p>
+
+                                <div class="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800/60 font-mono">
+                                    <span class="flex items-center gap-1.5 text-[11px]">
+                                        <i data-lucide="bookmark" class="w-3.5 h-3.5 text-cyan-400"></i>
+                                        <span>Evidence: <strong>Strong</strong></span>
+                                    </span>
+                                    
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[11px] flex items-center gap-1 text-slate-400">
+                                            <i data-lucide="link" class="w-3 h-3 text-cyan-400"></i>
+                                            2 Citations
+                                        </span>
+                                        <button onclick="toggleEvidenceDrawer('ledger-drawer-1')" class="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-0.5 transition-colors">
+                                            <span>Inspect Evidence</span>
+                                            <i id="icon-ledger-drawer-1" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Expandable Drawer 1 -->
+                            <div id="ledger-drawer-1" class="hidden bg-slate-950/60 border-t border-slate-800 px-5 py-4 space-y-4">
+                                <div class="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Citations & Direct Excerpts</div>
+                                <div class="space-y-3">
+                                    
+                                    <div class="bg-slate-900/60 border border-slate-850 p-3 rounded-lg space-y-2">
+                                        <div class="flex items-center justify-between text-[11px]">
+                                            <span class="font-semibold text-slate-200">Docket SB-224 Legislative Bill Text</span>
+                                            <span class="text-[10px] font-mono bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded">Tier 1 — Primary Document</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400 italic font-mono leading-relaxed">"...upon determination of systemic congestion risk, the State Utilities Board shall possess non-appealable municipal preemption authority..."</p>
+                                        <a href="#" class="text-[10px] text-cyan-400 hover:underline flex items-center gap-1 font-mono">
+                                            Browse direct bill source (state-legislature.gov) <i data-lucide="external-link" class="w-3 h-3"></i>
+                                        </a>
+                                    </div>
+                                    
+                                    <div class="bg-slate-900/60 border border-slate-850 p-3 rounded-lg space-y-2">
+                                        <div class="flex items-center justify-between text-[11px]">
+                                            <span class="font-semibold text-slate-200">Federal Circuit Appeal Ruling (D.C. 2025)</span>
+                                            <span class="text-[10px] font-mono bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded">Tier 1 — Primary Document</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400 italic font-mono leading-relaxed">"Held: Local zoning ordinances remain subject to overriding state regulatory grid resiliency mandates under structural public necessity..."</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LEDGER CARD 2: AMBIGUOUS EVIDENCE -->
+                        <div class="bg-slate-900 border border-slate-800/80 hover:border-slate-700/80 rounded-xl overflow-hidden transition-all">
+                            <div class="p-5 space-y-4">
+                                <div class="flex flex-wrap items-center justify-between gap-2.5">
+                                    <div class="flex items-center gap-2 text-[10px] font-mono">
+                                        <span class="text-cyan-400">Assertion #2</span>
+                                        <span class="text-slate-600">·</span>
+                                        <span class="bg-slate-950 text-slate-300 px-2 py-0.5 rounded">Causal Projection</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="bg-slate-950 text-slate-400 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">Partially Verifiable</span>
+                                        <span class="bg-amber-950/40 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-mono">Mixed evidence</span>
+                                    </div>
+                                </div>
+
+                                <p class="text-sm font-medium text-slate-200 leading-relaxed font-sans">
+                                    "The transmission paths will drive consumer base-rate electric utility cost increases of over 15% in rural counties."
+                                </p>
+
+                                <div class="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800/60 font-mono">
+                                    <span class="flex items-center gap-1.5 text-[11px]">
+                                        <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
+                                        <span>Evidence: <strong>Moderate</strong></span>
+                                    </span>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[11px] flex items-center gap-1 text-slate-400">
+                                            <i data-lucide="link" class="w-3 h-3 text-amber-400"></i>
+                                            1 Citation
+                                        </span>
+                                        <button onclick="toggleEvidenceDrawer('ledger-drawer-2')" class="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-0.5 transition-colors">
+                                            <span>Inspect Evidence</span>
+                                            <i id="icon-ledger-drawer-2" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Expandable Drawer 2 -->
+                            <div id="ledger-drawer-2" class="hidden bg-slate-950/60 border-t border-slate-800 px-5 py-4 space-y-4">
+                                <div class="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Citations & Direct Excerpts</div>
+                                <div class="bg-slate-900/60 border border-slate-850 p-3 rounded-lg space-y-2">
+                                    <div class="flex items-center justify-between text-[11px]">
+                                        <span class="font-semibold text-slate-200">Commission Study on Rural Electrification Costs</span>
+                                        <span class="text-[10px] font-mono bg-slate-850 text-slate-300 px-1.5 py-0.5 rounded">Tier 2 — Institutional Study</span>
+                                    </div>
+                                    <p class="text-xs text-slate-400 italic font-mono leading-relaxed">"Estimates project local distribution-side adjustments ranging from a 3% to 18% increase depending directly on cooperative subsidy pass-through legislation."</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LEDGER CARD 3: UNSUBSTANTIATED SPECULATION (Ethical Overlay Target) -->
+                        <div class="ethics-inspector-highlight border border-transparent rounded-xl p-1 transition-all duration-300">
+                            
+                            <div class="bg-slate-900 border border-slate-800/80 hover:border-slate-700/80 rounded-xl overflow-hidden">
+                                <div class="p-5 space-y-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-2.5">
+                                        <div class="flex items-center gap-2 text-[10px] font-mono">
+                                            <span class="text-cyan-400">Assertion #3</span>
+                                            <span class="text-slate-600">·</span>
+                                            <span class="bg-slate-950 text-slate-300 px-2 py-0.5 rounded">Opinion / Speculation</span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="bg-slate-950 text-slate-400 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">Unclear</span>
+                                            <span class="bg-slate-950 text-slate-400 border border-slate-850 px-2 py-0.5 rounded text-[10px] font-mono">No sufficient source found</span>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-sm font-medium text-slate-200 leading-relaxed font-sans">
+                                        "State governors are receiving private backchannel compensation from energy consortia to expedite zoning approval."
+                                    </p>
+
+                                    <div class="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800/60 font-mono">
+                                        <span class="flex items-center gap-1.5 text-[11px]">
+                                            <i data-lucide="bookmark" class="w-3.5 h-3.5 text-slate-500"></i>
+                                            <span>Evidence: <strong>Insufficient</strong></span>
+                                        </span>
+                                        <div class="flex items-center gap-3">
+                                            <span class="text-[11px] flex items-center gap-1 text-slate-500 italic">
+                                                0 Citations found
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Interactive Ethics Tooltip Popover -->
+                            <div class="ethics-tooltip hidden bg-cyan-950/90 border border-cyan-500/30 text-cyan-200 p-4 rounded-xl space-y-1.5 mt-3 shadow-lg max-w-2xl">
+                                <div class="font-bold text-xs uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 font-mono">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    Neutral Verdicts vs. Inflammatory Labels
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    Instead of labeling claims as "FALSE" or "MISLEADING" in bright red tags—which research proves causes defensiveness—we state: <strong class="text-cyan-400">"No sufficient source found."</strong> This visual pattern is a clean assessment of indexed sources, avoiding prosecutorial tone.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <hr class="border-slate-900">
+
+                    <!-- SECTION 3: FRAMING SIGNALS -->
+                    <section id="framing-signals" class="scroll-mt-24 space-y-6">
+                        
+                        <div class="space-y-1">
+                            <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                                <i data-lucide="scan-line" class="w-5 h-5 text-cyan-400"></i>
+                                Framing & Rhetorical Annotations
+                            </h2>
+                            <p class="text-xs text-slate-400">Structural linguistic and narrative mechanisms used to direct reader sentiments</p>
+                        </div>
+
+                        <!-- FRAMING CARD 1 (Ethical Overlay Target) -->
+                        <div class="ethics-inspector-highlight border border-transparent rounded-xl p-1 transition-all duration-300">
+                            
+                            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                                <div class="flex items-center justify-between text-xs font-mono">
+                                    <span class="bg-slate-950 text-cyan-400 border border-slate-800 px-2.5 py-1 rounded font-semibold text-[10px]">
+                                        Framing Signal: Emotionally Loaded Contrast
+                                    </span>
+                                    <span class="text-slate-500">Technique #14</span>
+                                </div>
+
+                                <!-- Actual transcribed text quote span -->
+                                <div class="bg-slate-950 border-l-2 border-cyan-500/50 p-4 rounded-r-lg space-y-1 font-mono">
+                                    <span class="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Transcribed Segment</span>
+                                    <p class="text-xs italic text-slate-300 leading-relaxed">
+                                        "...and so local citizens are being sacrificed by unelected metropolitan planning boards on the altar of carbon vanity projects..."
+                                    </p>
+                                </div>
+
+                                <!-- Explain why the system flagged this pattern -->
+                                <div class="space-y-1">
+                                    <span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold block">Mechanism Analysis</span>
+                                    <p class="text-xs text-slate-300 leading-relaxed font-sans">
+                                        The phrasing employs classic in-group/out-group opposition ("local citizens" vs. "unelected metropolitan planning boards") using emotive sacrificial verbs ("sacrificed... on the altar") rather than describing the administrative appeal channels legally mandated by the grid legislation.
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center justify-end text-xs font-mono">
+                                    <button onclick="toggleEvidenceDrawer('context-drawer-1')" class="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-0.5 transition-colors">
+                                        <span>Inspect Extended Context</span>
+                                        <i id="icon-context-drawer-1" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Extended Transcript Context Overlay drawer -->
+                                <div id="context-drawer-1" class="hidden bg-slate-950 border border-slate-850 p-4 rounded-xl space-y-2 mt-3 font-mono text-xs">
+                                    <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Surrounding 30-Second Segment</span>
+                                    <p class="text-slate-400 leading-relaxed">
+                                        "...this includes county energy plans. <mark class="bg-slate-950 text-slate-200 border border-slate-800 px-1 py-0.5 rounded font-semibold">And so local citizens are being sacrificed by unelected metropolitan planning boards on the altar of carbon vanity projects.</mark> We have checked, and citizens can still petition for public zoning hearings under Section 12-A..."
+                                    </p>
+                                    <span class="text-[9px] text-slate-500 block leading-relaxed">Showing surrounding transcript segments allows readers to independently verify if sentences were highlighted out of context.</span>
+                                </div>
+                            </div>
+
+                            <!-- Interactive Ethics Tooltip Popover -->
+                            <div class="ethics-tooltip hidden bg-cyan-950/90 border border-cyan-500/30 text-cyan-200 p-4 rounded-xl space-y-1.5 mt-3 shadow-lg max-w-2xl">
+                                <div class="font-bold text-xs uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 font-mono">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    Rhetorical Analysis Over Content Accusations
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    We never accuse a creator of "malicious bias" or "fake news." We isolate linguistic mechanisms, showcase the exact transcript text context, explain neutrally how these techniques shape emotional perception, and let the user make their own decision.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <hr class="border-slate-900">
+
+                    <!-- SECTION 4: RELATED CONTEXT -->
+                    <section id="useful-context" class="scroll-mt-24 space-y-6">
+                        
+                        <div class="space-y-1">
+                            <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                                <i data-lucide="book-open" class="w-5 h-5 text-cyan-400"></i>
+                                Related Context
+                            </h2>
+                            <p class="text-xs text-slate-400">Factual context variables or surrounding parameters relevant to the assertions that are absent in the content</p>
+                        </div>
+
+                        <!-- CONTEXT CARD 1 (Ethical Overlay Target) -->
+                        <div class="ethics-inspector-highlight border border-transparent rounded-xl p-1 transition-all duration-300">
+                            
+                            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+                                <div class="flex items-center gap-2 text-[10px] font-mono">
+                                    <span class="bg-slate-950 text-slate-300 border border-slate-800 px-2 py-0.5 rounded">Systemic Parameter</span>
+                                    <span class="text-slate-600">·</span>
+                                    <span class="text-slate-400">April 2026 Filing Records</span>
+                                </div>
+
+                                <h4 class="text-sm font-semibold text-slate-200">The Net Net Rate Adjustments & Offset Tariffs</h4>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    While the analyzed media heavily emphasizes the 10% structural transmission surcharge, other reporting on this topic also notes that the Public Utility Commission’s parallel April filing mandates an 8% reduction in wholesale energy distribution base tariffs, yielding a net consumer rate delta of roughly +2% upon completion.
+                                </p>
+                                
+                                <div class="text-[10px] font-mono bg-slate-950 border border-slate-850 px-3 py-2 rounded flex items-center justify-between text-slate-400">
+                                    <span>Reference: State Regulatory Commission Agenda Item 4.2</span>
+                                    <a href="#" class="text-cyan-400 hover:underline">Verify Docket Source</a>
+                                </div>
+                            </div>
+
+                            <!-- Interactive Ethics Tooltip Popover -->
+                            <div class="ethics-tooltip hidden bg-cyan-950/90 border border-cyan-500/30 text-cyan-200 p-4 rounded-xl space-y-1.5 mt-3 shadow-lg max-w-2xl">
+                                <div class="font-bold text-xs uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 font-mono">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    "Related Context" Over "Omissions/Gaps"
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    Naming section layouts "Omissions" or "Misleading Gaps" can sound explicitly hostile and accusatory. We name this section <strong>"Related Context"</strong> and explain surrounding parameters neutrally, avoiding aggressive finger-pointing.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <hr class="border-slate-900">
+
+                    <!-- SECTION 5: BRIDGING SOURCES -->
+                    <section id="bridging-sources" class="scroll-mt-24 space-y-6">
+                        
+                        <div class="space-y-1">
+                            <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                                <i data-lucide="git-merge" class="w-5 h-5 text-cyan-400"></i>
+                                Bridging Sources
+                            </h2>
+                            <p class="text-xs text-slate-400">Topic-matched, moderately divergent credible sources presenting alternative analytical frameworks</p>
+                        </div>
+
+                        <!-- BRIDGING PERSPECTIVES GRID DISPLAY (Ethical Overlay Target) -->
+                        <div class="ethics-inspector-highlight-violet border border-transparent rounded-xl p-1 transition-all duration-300">
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                
+                                <!-- Perspective Card 1 -->
+                                <div class="bg-slate-900 border border-slate-800 hover:border-slate-750 p-4 rounded-xl flex flex-col justify-between gap-4 transition-all">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between text-[10px] font-mono">
+                                            <span class="text-violet-400 font-semibold">Policy / Legal Perspective</span>
+                                            <span class="bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded">Tier 2</span>
+                                        </div>
+                                        <h4 class="text-sm font-semibold text-slate-200 line-clamp-2 leading-snug">
+                                            Municipal Autonomy & State Coordination under the Grid Decarbonization Act
+                                        </h4>
+                                        <p class="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+                                            Published in the Public Law Journal. Studies the constitutional balance of interstate power, framing the preemption clause as a necessary tool to build basic regional safety nets.
+                                        </p>
+                                    </div>
+                                    <div class="space-y-2 pt-2 border-t border-slate-850">
+                                        <div class="text-[9px] text-slate-500 font-mono">
+                                            WHY INCLUDED: Maps legal boundaries missing in the video's arguments.
+                                        </div>
+                                        <a href="#" class="text-[11px] font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                                            Explore Source <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- Perspective Card 2 -->
+                                <div class="bg-slate-900 border border-slate-800 hover:border-slate-750 p-4 rounded-xl flex flex-col justify-between gap-4 transition-all">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between text-[10px] font-mono">
+                                            <span class="text-violet-400 font-semibold">Scientific / Technical Perspective</span>
+                                            <span class="bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded">Tier 1</span>
+                                        </div>
+                                        <h4 class="text-sm font-semibold text-slate-200 line-clamp-2 leading-snug">
+                                            Thermal Micro-Grid Alternatives for Local Resilience
+                                        </h4>
+                                        <p class="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+                                            A study on decentralized thermal architecture from the National Energy Laboratory. Frames energy sovereignty through local microgeneration, supporting some of the video’s reliability concerns with hard quantitative models.
+                                        </p>
+                                    </div>
+                                    <div class="space-y-2 pt-2 border-t border-slate-850">
+                                        <div class="text-[9px] text-slate-500 font-mono">
+                                            WHY INCLUDED: Explores decentralized technology alternatives with rigorous data.
+                                        </div>
+                                        <a href="#" class="text-[11px] font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                                            Explore Source <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Interactive Ethics Tooltip Popover -->
+                            <div class="ethics-tooltip hidden bg-cyan-950/90 border border-cyan-500/30 text-cyan-200 p-4 rounded-xl space-y-1.5 mt-3 shadow-lg max-w-2xl">
+                                <div class="font-bold text-xs uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 font-mono">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    Bridging Frameworks Over Political Ideology Labels
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    We explicitly reject polarizing left/right ideology scales or red-blue political indicators. We categorize bridging perspectives by <strong>analytical lens</strong> (Policy, Technical, Local Impact), which invites educational cross-examination rather than partisan alignment.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <hr class="border-slate-900">
+
+                    <!-- SECTION 6: PROVENANCE FOOTER -->
+                    <footer id="provenance-footer" class="scroll-mt-24 space-y-6 pt-2 pb-16">
+                        
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 md:p-6 space-y-6">
+                            
+                            <!-- Header actions -->
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-850">
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                                        <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400"></i>
+                                        <span>System Provenance & Diagnostic Audits</span>
+                                    </div>
+                                    <p class="text-xs text-slate-400">Verifiably trace the computational processing and pipeline layers for this analysis</p>
+                                </div>
+                                
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="openDisputeModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center gap-1">
+                                        <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                                        Dispute Analysis
+                                    </button>
+                                    <button onclick="copyShareLink()" class="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-400 text-xs font-semibold rounded-lg border border-cyan-500/20 transition-colors flex items-center gap-1">
+                                        <i data-lucide="share" class="w-3.5 h-3.5"></i>
+                                        Copy Shareable Link
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Diagnostic logs grid -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                                <div class="space-y-1">
+                                    <span class="text-slate-500 block uppercase text-[9px]">Pipeline Source</span>
+                                    <span class="font-medium text-slate-300">f-Socials Extraction Engine</span>
+                                </div>
+                                <div class="space-y-1">
+                                    <span class="text-slate-500 block uppercase text-[9px]">Model Version</span>
+                                    <span class="font-medium text-slate-300">claude-3-5-sonnet-v1.2</span>
+                                </div>
+                                <div class="space-y-1">
+                                    <span class="text-slate-500 block uppercase text-[9px]">Ingest Policy Document</span>
+                                    <a href="#methodology" onclick="scrollToMethodology(event)" class="text-cyan-400 hover:underline">Standard policy-v1.4</a>
+                                </div>
+                                <div class="space-y-1">
+                                    <span class="text-slate-500 block uppercase text-[9px]">Audit Review Layer</span>
+                                    <div class="flex items-center gap-1.5 text-slate-400 font-semibold">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                        <span>AI Core Only</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="text-[10px] text-slate-500 leading-relaxed font-mono">
+                                f-Socials operates as an advisory context layer under the EU AI Act regulations. Extract statistics, citations and metadata do not constitute legal declarations of fact.
+                            </p>
+                        </div>
+                    </footer>
+
+                    <!-- METHODOLOGY DETAIL SECTION -->
+                    <section id="methodology" class="scroll-mt-24 space-y-4 pt-4 pb-12 border-t border-slate-900">
+                        <div class="bg-slate-900/20 border border-slate-900 rounded-xl p-6 space-y-4">
+                            <div class="space-y-1">
+                                <h3 class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">f-Socials Public Methodology</h3>
+                                <p class="text-xs text-slate-300 leading-relaxed">How we parse content to keep it a clean, unbiased evidence table:</p>
+                            </div>
+                            <div class="space-y-3 text-xs text-slate-400 leading-relaxed">
+                                <p>
+                                    <strong>1. Primary Sourcing Invariant:</strong> No factual claim is featured in our ledger unless backed by verifiable, indexed primary resources (court records, legal filings, published research). We will not guess or let the AI speculate.
+                                </p>
+                                <p>
+                                    <strong>2. Structural Labeling:</strong> Rather than diagnosing the author's intent ("bad faith" or "untruthful"), we focus exclusively on identifying patterns of framing (such as isolating specific sentences, truncated timelines, or loaded contrasts) so that readers can develop their own critical evaluation skills.
+                                </p>
+                                <p>
+                                    <strong>3. Non-Polarizing Bridging:</strong> Alternative sources are programmatically selected based on semantic alignment to provide highly diverse but constructive perspectives. We explicitly filter out dehumanizing arguments or poor-quality content, focusing instead on presenting varied analytical viewpoints (such as policy, legal, or technical lenses).
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- INTERACTIVE DISPUTE MODAL (Trust Object component) -->
+    <div id="disputeModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-cyan-400"></i>
+                    <h3 class="font-bold text-slate-100 font-sans">Submit Audit Challenge</h3>
+                </div>
+                <button onclick="closeDisputeModal()" class="text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-850 rounded transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <form id="disputeForm" onsubmit="submitDispute(event)" class="p-6 space-y-4">
+                <div class="space-y-1.5 text-xs font-mono">
+                    <label class="text-slate-400 uppercase tracking-wider text-[10px] font-semibold block">Select Target Claim or Signal</label>
+                    <select required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-slate-300 focus:outline-none focus:border-cyan-500/50 transition-colors">
+                        <option value="claim-1">Claim #1: Municipal Preemption Zoning</option>
+                        <option value="claim-2">Claim #2: Consumer Rate Delta Cost Projection</option>
+                        <option value="claim-3">Claim #3: Speculative Governor Compensation</option>
+                        <option value="other font-sans">General System Metadata Error</option>
+                    </select>
+                </div>
+
+                <div class="space-y-1.5 text-xs font-mono">
+                    <label class="text-slate-400 uppercase tracking-wider text-[10px] font-semibold block">Describe the Factual Discrepancy</label>
+                    <textarea required rows="4" placeholder="Please provide specific factual evidence, state docket references, or direct transcript context to justify the challenge..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-300 focus:outline-none focus:border-cyan-500/50 transition-colors placeholder:text-slate-700 resize-none font-sans"></textarea>
+                </div>
+
+                <div class="space-y-1.5 text-xs font-mono">
+                    <label class="text-slate-400 uppercase tracking-wider text-[10px] font-semibold block">Primary Evidence / Citation URL</label>
+                    <input type="url" required placeholder="https://example.gov/regulatory-docket" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-slate-300 focus:outline-none focus:border-cyan-500/50 transition-colors placeholder:text-slate-700">
+                </div>
+
+                <!-- Footer buttons -->
+                <div class="flex items-center justify-end gap-3 pt-2 text-xs">
+                    <button type="button" onclick="closeDisputeModal()" class="px-4 py-2 font-mono text-slate-400 hover:text-slate-200 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold rounded-lg transition-colors shadow-lg shadow-cyan-500/10">
+                        Submit Audit Challenge
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom clean Toast Notification System (Never use alerts) -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-10 opacity-0 pointer-events-none transition-all duration-300 bg-slate-900 border border-cyan-500/30 px-4 py-3 rounded-xl flex items-center gap-2.5 shadow-2xl">
+        <div class="p-1.5 bg-cyan-950 rounded-lg text-cyan-400 border border-cyan-500/10">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+        </div>
+        <span id="toastMessage" class="text-xs font-mono text-slate-200"></span>
+    </div>
+
+    <script>
+        // App Core State
+        let ethicsOverlayActive = false;
+
+        // Initialize Icons
+        window.onload = function() {
+            lucide.createIcons();
+        };
+
+        // Select demo links helper
+        function selectDemoUrl(url) {
+            document.getElementById('inputMediaUrl').value = url;
+            showToast("Demo URL selected. Click 'Analyze Content' to load.");
+        }
+
+        // Run Mock Ingestion Pipeline with sequential steps
+        function runIngestionPipeline() {
+            const urlValue = document.getElementById('inputMediaUrl').value.trim();
+            if (!urlValue) {
+                showToast("Please enter or paste a valid URL / Transcript.");
+                return;
+            }
+
+            // Transition to loading view
+            document.getElementById('screen-ingest').classList.add('hidden');
+            document.getElementById('screen-loading').classList.remove('hidden');
+            
+            // Adjust Nav selections
+            document.getElementById('btnNavIngest').classList.remove('bg-slate-850', 'text-slate-200');
+            document.getElementById('btnNavIngest').classList.add('text-slate-400');
+            document.getElementById('btnNavReport').classList.remove('bg-slate-850', 'text-slate-200');
+            document.getElementById('btnNavReport').classList.add('text-slate-400');
+
+            // Set pipeline logs progress timeouts (Mocking the server pipeline execution)
+            const consoleBox = document.getElementById('console-logs');
+            const steps = [
+                { id: 'step-1', text: 'Acquired YouTube captions track. Parsing raw lines...', icon: 'check-circle', delay: 1000 },
+                { id: 'step-2', text: 'Isolated 3 primary assertions of fact. Fetching related citations...', icon: 'check-circle', delay: 2500 },
+                { id: 'step-3', text: 'Checked 23 municipal registries. Cross-referencing legislation SB-224...', icon: 'check-circle', delay: 4200 },
+                { id: 'step-4', text: 'Analyzed rhetorical patterns. Flagged contrast technique #14...', icon: 'check-circle', delay: 5800 },
+                { id: 'step-5', text: 'Bridged matching diverse articles. Indexing scientific journals...', icon: 'check-circle', delay: 7200 }
+            ];
+
+            steps.forEach((step, index) => {
+                setTimeout(() => {
+                    // Update Pipeline elements
+                    const row = document.getElementById(step.id);
+                    const icon = document.getElementById(`${step.id}-icon`);
+                    const statusText = document.getElementById(`${step.id}-status`);
+                    
+                    row.classList.remove('text-slate-400', 'text-slate-600', 'bg-slate-950/40', 'border-slate-900/60');
+                    row.classList.add('bg-slate-950', 'border-slate-850', 'text-slate-200');
+                    
+                    icon.style.color = '#22d3ee';
+                    icon.setAttribute('data-lucide', step.icon);
+                    statusText.innerText = 'Completed';
+                    statusText.classList.remove('text-cyan-400');
+                    statusText.classList.add('text-slate-400');
+
+                    // Add console print logs
+                    const log = document.createElement('p');
+                    log.className = 'text-slate-400';
+                    log.innerText = `[SUCCESS] ${step.text}`;
+                    consoleBox.appendChild(log);
+                    consoleBox.scrollTop = consoleBox.scrollHeight;
+
+                    // Trigger the next step visual active if present
+                    if (index < steps.length - 1) {
+                        const nextRow = document.getElementById(steps[index+1].id);
+                        const nextIcon = document.getElementById(`${steps[index+1].id}-icon`);
+                        const nextStatus = document.getElementById(`${steps[index+1].id}-status`);
+                        
+                        nextRow.classList.remove('text-slate-600', 'border-slate-900/60');
+                        nextRow.classList.add('text-slate-400');
+                        nextIcon.classList.add('animate-pulse');
+                        nextIcon.style.color = '#22d3ee';
+                        nextStatus.innerText = 'Processing';
+                        nextStatus.classList.add('text-cyan-400');
+                    }
+
+                    lucide.createIcons();
+                }, step.delay);
+            });
+
+            // Final transition to Report Screen
+            setTimeout(() => {
+                showReportDirectly();
+                showToast("Analysis complete. Verified metadata report loaded.");
+            }, 8500);
+        }
+
+        // Direct Report Toggle
+        function showReportDirectly() {
+            document.getElementById('screen-ingest').classList.add('hidden');
+            document.getElementById('screen-loading').classList.add('hidden');
+            document.getElementById('screen-report').classList.remove('hidden');
+
+            document.getElementById('btnNavIngest').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-850 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5";
+            document.getElementById('btnNavReport').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-850 text-slate-200 border border-slate-750 transition-all flex items-center gap-1.5";
+        }
+
+        // Back to direct ingestion screen
+        function showIngestScreen() {
+            document.getElementById('screen-report').classList.add('hidden');
+            document.getElementById('screen-loading').classList.add('hidden');
+            document.getElementById('screen-ingest').classList.remove('hidden');
+
+            document.getElementById('btnNavIngest').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-850 text-slate-200 border border-slate-750 transition-all flex items-center gap-1.5";
+            document.getElementById('btnNavReport').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-850 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5";
+        }
+
+        // Toggles Custom Drawers
+        function toggleEvidenceDrawer(drawerId) {
+            const drawer = document.getElementById(drawerId);
+            const icon = document.getElementById(`icon-${drawerId}`);
+            
+            if (drawer.classList.contains('hidden')) {
+                drawer.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                drawer.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Toggles visual ethics overlays and updates buttons
+        function toggleEthicsOverlay() {
+            const body = document.body;
+            const btn = document.getElementById('toggleEthicsInspector');
+            
+            ethicsOverlayActive = !ethicsOverlayActive;
+            
+            if (ethicsOverlayActive) {
+                body.classList.add('ethics-active');
+                btn.innerHTML = `<i data-lucide="eye-off" class="w-3.5 h-3.5"></i> <span>Deactivate Ethics Inspector</span>`;
+                btn.classList.remove('bg-slate-950', 'text-cyan-400', 'border-slate-800');
+                btn.classList.add('bg-cyan-500', 'text-slate-950', 'border-cyan-400', 'font-bold');
+                showToast("UX Ethics Inspector mode activated. Review highlighted guidelines.");
+            } else {
+                body.classList.remove('ethics-active');
+                btn.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i> <span>Activate Ethics Inspector</span>`;
+                btn.classList.remove('bg-cyan-500', 'text-slate-950', 'border-cyan-400', 'font-bold');
+                btn.classList.add('bg-slate-950', 'text-cyan-400', 'border-slate-800');
+                showToast("UX Ethics Inspector mode deactivated.");
+            }
+            lucide.createIcons();
+        }
+
+        // Inline notification toasts
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const msgSpan = document.getElementById('toastMessage');
+            
+            msgSpan.innerText = message;
+            toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+            }, 5000);
+        }
+
+        // Copies clipboard mock link using fallback textareas
+        function copyShareLink() {
+            const textToCopy = "https://f-socials.org/r/grid2-transition-analysis";
+            const el = document.createElement('textarea');
+            el.value = textToCopy;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showToast("Diagnostic analysis URL copied to clipboard.");
+        }
+
+        // Dismiss notice helper
+        function dismissNotice() {
+            const banner = document.getElementById('inspectorNotice');
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateY(-5px)';
+            setTimeout(() => banner.remove(), 250);
+        }
+
+        // Smoothly scrolls window to Methodology Block
+        function scrollToMethodology(event) {
+            event.preventDefault();
+            document.getElementById('methodology').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Dispute Modal functions
+        function openDisputeModal() {
+            document.getElementById('disputeModal').classList.remove('hidden');
+        }
+
+        function closeDisputeModal() {
+            document.getElementById('disputeModal').classList.add('hidden');
+        }
+
+        function submitDispute(event) {
+            event.preventDefault();
+            closeDisputeModal();
+            showToast("Challenge logged. The f-Socials audit registry will review primary sources.");
+            document.getElementById('disputeForm').reset();
+        }
+    </script>
+</body>
+</html>

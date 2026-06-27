@@ -1,0 +1,20 @@
+{
+  "name": "f-socials",
+  "private": true,
+  "version": "0.1.0",
+  "description": "f-Socials — a media-literacy lens, not a judge. Monorepo root.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/server",
+    "dev:web": "npm run dev -w apps/web",
+    "start": "npm run start -w apps/server",
+    "test": "npm run test -w apps/server",
+    "typecheck": "npm run typecheck -w apps/server && npm run typecheck -w apps/web",
+    "migrate": "node scripts/migrate.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

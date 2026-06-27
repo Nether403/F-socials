@@ -1,0 +1,28 @@
+{
+  "name": "@f-socials/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "f-Socials API + analysis worker (first slice).",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts"
+  },
+  "dependencies": {
+    "bullmq": "^5.79.1",
+    "express": "^5.1.0",
+    "ioredis": "^5.11.1",
+    "jose": "^6.2.3",
+    "pg": "^8.22.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
