@@ -17,14 +17,14 @@ Updated as we go. Priorities: **P0** = before public/real use · **P1** = soon, 
 | LLM extraction | **real** — Gemini 3.1-flash-lite + model fallback ✓ |
 | Evidence | **real** — chain (Google Fact Check → GDELT → Tavily) wrapped by the **claim-verification-router**: normalize → triage → query pack → retrieve → validate → outcome. Cites only evidence that matches the claim; honest "no sufficient evidence found" otherwise ✓ |
 | Perspectives | **real** — bridging: Tavily + Gemini ✓ |
-| Infra (cache/queue/repo) | **real** — Neon Postgres + Upstash (cache + BullMQ), verified durable across restart |
+| Infra (cache/queue/repo) | **real** — Neon Postgres + Upstash (cache + BullMQ), verified durable across restart. Reports persist as lossless JSONB **and** dual-write into normalized `claims`/`citations`/`perspective_links` rows for cross-report analytics |
 | Auth / rate limiting | **both ✓** — Supabase JWT verify (optional auth + `requireAuth`), per-user/per-IP rate limiting |
 | Source-tier policy | **real ✓** — transparent versioned classifier from open signals, authoritative in the pipeline, served at `GET /api/v1/policy` |
 | Dispute / flag intake | **real ✓** — anonymous disputes · authenticated technique flags (memory + Postgres + migration 002) |
 | Build / process split | **real ✓** — `tsc` type gate + `tsup` emit; API (`index.ts`) and worker (`worker.ts`) split; startup config validation; origin-checked CORS |
 | Frontend | **report page + methodology + dispute modal live** (`apps/web`) — submit · loading · report · share · `#/methodology` · dispute/flag/save with auth prompt; accessibility pass (color-never-alone, ARIA, keyboard/focus, ≤768px) |
 
-Verified end-to-end with all real analysis providers + a clickable React UI. Backend unit + property tests and the web Vitest + property suite are green (plus build-smoke and degraded-controls integration checks run separately). The server suite is at 88 passing and `tsc --noEmit` is clean after the claim-verification-router landed.
+Verified end-to-end with all real analysis providers + a clickable React UI. Backend unit + property tests and the web Vitest + property suite are green (plus build-smoke and degraded-controls integration checks run separately). The server offline suite is at **109 passing** and `tsc --noEmit` is clean after the report-graph-normalization dual-write landed; the 3 DB-dependent Postgres integration tests live in a separate `test:integration` script and skip cleanly without `DATABASE_URL`.
 
 ---
 
@@ -40,6 +40,20 @@ Replaces Stage 3's old "first provider with citations wins" `evidence.gather` lo
 - [x] **Neutrality enforced.** Static checks assert no Ad Fontes / AllSides / MBFC dataset is imported and that `VerifiedClaim`/`AuditRecord` expose no content-truth verdict or creator-reliability field.
 - [x] **Tests.** All 16 correctness properties as `fast-check` PBTs (≥100 runs each, seeded deterministic normalizer/validator mocks so the router's logic — not the LLM — is under test), plus example/integration/neutrality tests. `fast-check` added as a dev dependency.
 - [~] **Offline benchmark + Ship_Gate.** `src/router/benchmark/` computes `False_Evidence_Rate` per strategy (`current_chain` vs `router`, extraction model held constant) with a Ship_Gate (`FER_router ≤ FER_current`). The router is wired **live**; the current `fixtures.json` (~92 claims) uses synthetic `.example` URLs, so **running the benchmark on a real labeled set is the next step before relying on the gate decision in production** (folds into the educator-pilot labeled-claim collection).
+
+---
+
+## Report-graph normalization (dual-write) — shipped
+
+Activates the reserved `claims`/`citations`/`perspective_links` tables so every persisted report also projects into normalized rows for cross-report analytics — *before* the first aggregate feature, as the roadmap (§7) committed. Additive and lazy: a pure projection module folded into the existing `Repository.saveReport` on both drivers (zero call-site changes), an ordered migration, a one-shot backfill, and the property/example/integration/smoke suite.
+
+- [x] **Pure projection module** (`core/reportGraph.ts`). `projectReportGraph(report)` is a deterministic, I/O-free mapping from an `AnalysisReport` to its `ClaimRow`/`CitationRow`/`PerspectiveRow` set: one claim row per claim (`claimUid = Claim.id` for stable traceback), one citation row per citation linked by `claimUid`, one perspective row per perspective. A `none`/zero-citation claim projects a claim row with zero citation rows; non-normalized fields (`evidenceDescription`, `whyIncluded`) stay in JSONB only. Carries a guarded inline self-check.
+- [x] **Dual-write folded into `saveReport`** (memory + Postgres). The JSONB payload stays the authoritative render source of truth, written and committed first exactly as before; the normalized rows are a separate, **best-effort** write. Postgres runs a single delete-then-insert transaction (idempotent replace, atomic per report); a failure is logged with the `report_id` via `console.error` and **never rethrown**, so the report stays served from JSONB. The memory driver mirrors it with public `claimRows`/`citationRows`/`perspectiveRows` accessors (like `disputes`/`flags`/`auditRecords`), keeping the offline path testable.
+- [x] **Migration `004_report_graph.sql`.** Additive DDL after `003`: `claims.claim_uid` + a `(report_id, claim_uid)` unique index (the idempotent-replace natural key), plus cross-report query indexes on `citations(source_url)`, `citations(source_tier)`, `claims(claim_text)`, `perspective_links(source_tier)`. Preserves all existing `analysis_reports` data and JSONB consumers; no creator-reliability column.
+- [x] **Backfill command** (`src/scripts/backfill.ts`, run via `tsx`). Iterates `listReportIds()`, skips reports that already have rows (`hasReportGraph`), and re-saves the rest through the same idempotent dual-write. Reads JSONB only, never mutates it; a per-report failure is recorded (`report_id`) and the loop continues; logs `{ processed, skipped, failed }`.
+- [x] **Neutrality enforced.** Tiers attach to `citations`/`perspective_links` only — there is structurally no creator input to read. A static `Neutrality_Check` asserts the row types, projection source, and migration carry no creator-reliability dimension; a property test confirms no claim row carries a tier.
+- [x] **Invariant gate untouched.** `core/assemble.ts` is verified, not edited — generators produce gate-valid reports and the projection faithfully reflects that state without re-deriving the gate. A guard smoke test asserts the gate is unmodified, migration ordering is correct, and `writeReportGraph` uses `$1..$n` placeholders only.
+- [x] **Tests.** Eight `fast-check` PBTs (≥100 runs: dual-write, cardinality + linkage, round-trip field consistency, non-normalized retention, idempotent replace, backfill, source-only tiers, gate-faithful reflection) against `InMemoryRepository`, plus example tests (durability under normalized-write failure, backfill failure continuation, offline wiring), static smoke tests (neutrality, guards, interface parity), and 3 Postgres integration tests (migration non-destructiveness, transactional atomicity, cross-report `GROUP BY` queryability) that skip without a test DB. Offline suite 109/109 green; `npm run typecheck` clean.
 
 ---
 
@@ -67,9 +81,9 @@ Replaces Stage 3's old "first provider with citations wins" `evidence.gather` lo
 
 ## To-Do — Infra & persistence
 
-- [x] **Repository → Neon Postgres.** Wired via `pg`; `npm run migrate` applies `db/migrations/*.sql` (now `001_init.sql` + `002_dispute_claim_id.sql` + `003_audit_records.sql`). Verified: reports survive a server restart.
+- [x] **Repository → Neon Postgres.** Wired via `pg`; `npm run migrate` applies `db/migrations/*.sql` (now `001_init.sql` + `002_dispute_claim_id.sql` + `003_audit_records.sql` + `004_report_graph.sql`). Verified: reports survive a server restart.
 - [x] **Cache + Queue → Upstash Redis.** URL-hash cache (ioredis) + durable BullMQ queue. Verified: cache hit on resubmit, jobs process.
-- [~] **Persist the full report graph.** v1 stores the whole report as **JSONB** in `analysis_reports.data` (lossless). The normalized `claims`/`citations`/`perspective_links` tables are **reserved, not yet populated** — normalize them when analytics / channel-scorecards need cross-report queries.
+- [x] **Persist the full report graph.** v1 stored the whole report as **JSONB** in `analysis_reports.data` (still the lossless render source of truth). The reserved `claims`/`citations`/`perspective_links` tables are now **populated via the dual-write** (report-graph-normalization, migration `004`): every `saveReport` projects the report into normalized rows for cross-report analytics, with a one-shot backfill for pre-feature JSONB-only reports. Best-effort and additive — a normalized-write failure never damages the served JSONB. (See the "Report-graph normalization" shipped section.)
 - [x] **Store the raw transcript + title.** Now saved on the report (`transcript`, `title`) — powers interactive highlighting and the report header.
 - [x] **`share_slug` public route.** `GET /api/v1/r/:slug` (public, no auth) + frontend `#/r/:slug` deep-link page + "Share / copy link" button. Verified end-to-end.
 - [ ] **P2 — Fix `.env` REDIS_URL scheme.** It's `redis://`; Upstash is TLS-only. Code now auto-forces TLS for `*.upstash.io`, but change it to `rediss://` for correctness.
