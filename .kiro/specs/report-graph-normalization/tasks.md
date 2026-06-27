@@ -100,8 +100,8 @@ Non-negotiables enforced throughout: `core/assemble.ts` is never modified, param
     - **Property 8: Faithful reflection of the gate-satisfying state without re-deriving the gate**
     - **Validates: Requirements 10.2**
 
-- [ ] 8. Backfill property and example tests
-  - [-] 8.1 Write property test `test/reportGraph.backfill.test.ts`
+- [x] 8. Backfill property and example tests
+  - [x] 8.1 Write property test `test/reportGraph.backfill.test.ts`
     - **Property 6: Backfill populates JSONB-only reports, skips populated ones, never mutates JSONB**
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4**
 
@@ -130,7 +130,7 @@ Non-negotiables enforced throughout: `core/assemble.ts` is never modified, param
     - Both drivers implement `hasReportGraph`/`listReportIds`; the memory driver exposes `claimRows`/`citationRows`/`perspectiveRows`
     - _Requirements: 6.1, 6.4_
 
-- [ ] 10. Postgres integration tests (require a test Postgres)
+- [x] 10. Postgres integration tests (require a test Postgres)
   - [x] 10.1 Write integration test `test/reportGraph.migration.test.ts`
     - Seed `analysis_reports`, apply `004_report_graph.sql`, assert `claim_uid` + new indexes exist and existing data + `getReport` are intact
     - _Requirements: 7.2, 7.3_
@@ -139,16 +139,16 @@ Non-negotiables enforced throughout: `core/assemble.ts` is never modified, param
     - Force a failure mid-rewrite; assert the prior complete row set survives (no partial set observable)
     - _Requirements: 4.4_
 
-  - [ ] 10.3 Write integration test `test/reportGraph.crossReport.test.ts`
+  - [x] 10.3 Write integration test `test/reportGraph.crossReport.test.ts`
     - Seed several reports' rows; run `GROUP BY report_id` and group-by-source joins on the indexed columns; assert correct counts without reading `analysis_reports.data`
     - _Requirements: 11.1, 11.2_
 
-- [ ] 11. Wire tests into the suite and final checkpoint
-  - [ ] 11.1 Add the new `test/*.test.ts` files to the `test` script file list in `app/apps/server/package.json`
+- [x] 11. Wire tests into the suite and final checkpoint
+  - [x] 11.1 Add the new `test/*.test.ts` files to the `test` script file list in `app/apps/server/package.json`
     - Include the property, example, and smoke tests; keep slow/DB-dependent integration tests grouped appropriately
     - _Requirements: 6.1_
 
-  - [ ] 11.2 Final checkpoint - Ensure all tests pass
+  - [x] 11.2 Final checkpoint - Ensure all tests pass
     - Run `npm test` + `npm run typecheck` in `apps/server`; ask the user if questions arise.
 
 ## Notes

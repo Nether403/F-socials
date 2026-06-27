@@ -10,8 +10,9 @@
     "start": "node dist/index.js",
     "start:worker": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts test/config.test.ts test/cors.test.ts test/sourceTier.totality.test.ts test/sourceTier.signals.test.ts test/sourceSignals.provenance.test.ts test/gate.uncited.test.ts test/gate.honestNone.test.ts test/gate.framing.test.ts test/gate.readiness.test.ts test/gate.tierNeutral.test.ts test/servedTiers.test.ts test/dispute.persist.test.ts test/flag.persist.test.ts test/flag.unauth.test.ts test/missingReport.test.ts test/invalidBody.test.ts test/protectedRoutes.test.ts \"test/router/**/*.test.ts\"",
-    "test:build": "node --import tsx --test test/build.smoke.test.ts test/degraded.test.ts"
+    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts test/config.test.ts test/cors.test.ts test/sourceTier.totality.test.ts test/sourceTier.signals.test.ts test/sourceSignals.provenance.test.ts test/gate.uncited.test.ts test/gate.honestNone.test.ts test/gate.framing.test.ts test/gate.readiness.test.ts test/gate.tierNeutral.test.ts test/servedTiers.test.ts test/dispute.persist.test.ts test/flag.persist.test.ts test/flag.unauth.test.ts test/missingReport.test.ts test/invalidBody.test.ts test/protectedRoutes.test.ts test/reportGraph.dualwrite.test.ts test/reportGraph.cardinality.test.ts test/reportGraph.roundtrip.test.ts test/reportGraph.retain.test.ts test/reportGraph.idempotent.test.ts test/reportGraph.neutrality.prop.test.ts test/reportGraph.gateReflect.test.ts test/reportGraph.backfill.test.ts test/reportGraph.backfillFailure.test.ts test/reportGraph.durability.test.ts test/reportGraph.offlineWiring.test.ts test/reportGraph.neutralityStatic.test.ts test/reportGraph.guards.test.ts test/reportGraph.parity.test.ts \"test/router/**/*.test.ts\"",
+    "test:build": "node --import tsx --test test/build.smoke.test.ts test/degraded.test.ts",
+    "test:integration": "node --import tsx --test test/reportGraph.migration.test.ts test/reportGraph.atomicity.test.ts test/reportGraph.crossReport.test.ts"
   },
   "dependencies": {
     "bullmq": "^5.79.1",
