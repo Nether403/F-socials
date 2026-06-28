@@ -8,6 +8,7 @@ import { assembleReport, type AssembleResult } from '../core/assemble';
 import { classifyCitationTier } from '../core/sourceTier';
 import { verifyClaim, type VerifyDeps } from '../router/index';
 import { makeRetrieve } from '../router/retrieve';
+import { Semaphore } from '../concurrency';
 
 export interface PipelineResult extends AssembleResult {
   transcript: string;
@@ -21,7 +22,11 @@ export interface PipelineResult extends AssembleResult {
   usefulContext: Candidate[];
 }
 
-export async function runPipeline(input: RawInput, providers: Providers): Promise<PipelineResult> {
+export async function runPipeline(
+  input: RawInput,
+  providers: Providers,
+  concurrencyCap = 1, // serial baseline by default; worker passes config.concurrencyCap
+): Promise<PipelineResult> {
   // Stage 1: transcript
   const transcript = await providers.transcript.fetch(input);
 
@@ -41,6 +46,12 @@ export async function runPipeline(input: RawInput, providers: Providers): Promis
   // so we cannot honestly attribute a matched_fact_check outcome to it. Upgrade path
   // (task 11.3): pass the per-provider list with isFactCheck set on the Google Fact
   // Check source so that outcome can be distinguished.
+  // One shared counting semaphore per report (the Bounded_Scheduler): created once and
+  // threaded into every claim's verifyClaim so the global count of in-flight
+  // Provider_Chain submissions is ≤ concurrencyCap by construction, regardless of how
+  // work splits across the claim loop (below) and the per-claim variant loop
+  // (router/index.ts). concurrencyCap=1 collapses to the exact serial baseline.
+  const semaphore = new Semaphore(concurrencyCap);
   const verifyDeps: VerifyDeps = {
     normalizer: providers.normalizer,
     validator: providers.validator,
@@ -49,36 +60,52 @@ export async function runPipeline(input: RawInput, providers: Providers): Promis
       classifyTier: classifyCitationTier,
     }),
     classifyTier: classifyCitationTier,
+    semaphore,
   };
 
-  const claims: Claim[] = [];
-  const audits: AuditRecord[] = [];
-  const usefulContext: Candidate[] = [];
-  const routerContextCards: ContextCard[] = [];
-  for (const c of extraction.claims) {
-    const verified = await verifyClaim(c.claimText, verifyDeps);
-    claims.push({
-      id: randomUUID(),
-      claimText: c.claimText,
-      transcriptSpan: c.transcriptSpan,
-      verifiability: c.verifiability,
-      sourceBasis: c.sourceBasis,
-      confidence: c.confidence,
-      // Strength + citations come straight from the router. Citations are Claim_Ledger
-      // evidence ONLY (same_claim / contradictory_but_relevant) and are already
-      // tier-classified by retrieval (via classifyCitationTier), so no re-classification
-      // is needed here. A no_sufficient_evidence / relevant_context_only /
-      // not_fact_checkable outcome carries zero citations, so the honest-none state
-      // reaches the gate intact and no non-matching candidate is presented as evidence
-      // (Req 7.1, 7.4).
-      evidenceStrength: verified.evidenceStrength,
-      citations: verified.citations,
-    });
-    audits.push(verified.audit);
-    // relevant_context_only material — surfaced as context, never as a citation (7.2).
-    usefulContext.push(...verified.usefulContext);
-    routerContextCards.push(...verified.contextCards);
-  }
+  // Verify all claims in parallel, gated by the shared semaphore. Results are written
+  // into pre-sized arrays at each claim's extraction index so completion order never
+  // affects output order (Req 3.1, 3.2, 3.3): claims[i]/audits[i] align by index, and
+  // the per-claim context arrays are flattened in index order. A claim's failure is
+  // isolated to its own slot (verifyClaim is total; Promise.all never cancels siblings),
+  // so a single troubled claim never shifts, drops, or reorders the rest (Req 4.1, 4.5).
+  const n = extraction.claims.length;
+  const claims: Claim[] = new Array(n);
+  const audits: AuditRecord[] = new Array(n);
+  const perClaimUseful: Candidate[][] = new Array(n);
+  const perClaimCards: ContextCard[][] = new Array(n);
+
+  await Promise.all(
+    extraction.claims.map(async (c, i) => {
+      const verified = await verifyClaim(c.claimText, verifyDeps);
+      claims[i] = {
+        id: randomUUID(),
+        claimText: c.claimText,
+        transcriptSpan: c.transcriptSpan,
+        verifiability: c.verifiability,
+        sourceBasis: c.sourceBasis,
+        confidence: c.confidence,
+        // Strength + citations come straight from the router. Citations are Claim_Ledger
+        // evidence ONLY (same_claim / contradictory_but_relevant) and are already
+        // tier-classified by retrieval (via classifyCitationTier), so no re-classification
+        // is needed here. A no_sufficient_evidence / relevant_context_only /
+        // not_fact_checkable outcome carries zero citations, so the honest-none state
+        // reaches the gate intact and no non-matching candidate is presented as evidence
+        // (Req 7.1, 7.4).
+        evidenceStrength: verified.evidenceStrength,
+        citations: verified.citations,
+      };
+      audits[i] = verified.audit;
+      // relevant_context_only material — surfaced as context, never as a citation (7.2).
+      perClaimUseful[i] = verified.usefulContext;
+      perClaimCards[i] = verified.contextCards;
+    }),
+  );
+
+  // Flatten in extraction-index order: grouped by claim index ascending, in-group order
+  // preserved (Req 3.3).
+  const usefulContext: Candidate[] = perClaimUseful.flat();
+  const routerContextCards: ContextCard[] = perClaimCards.flat();
 
   // Framing signals: locate each example's quote in the transcript for UI highlighting.
   // ponytail: indexOf finds the FIRST occurrence; duplicate quotes resolve to the first.

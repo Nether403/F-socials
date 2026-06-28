@@ -8,6 +8,29 @@ function boolEnv(value: string | undefined, fallback: boolean): boolean {
 
 const isDeployed = process.env.NODE_ENV === 'production';
 
+export const CONCURRENCY_CAP_DEFAULT = 4;
+const CONCURRENCY_CAP_MIN = 1;
+const CONCURRENCY_CAP_MAX = 32;
+
+// Resolve CONCURRENCY_CAP from its raw env string. Valid = an integer in [1,32]; anything
+// absent, empty, non-numeric, non-integer, or out of range falls back to the documented
+// default 4 (rejected to default, NOT clamped) and returns a warning naming the variable
+// (Req 2.2, 2.3, 2.4). Pure → unit/property tested.
+export function resolveConcurrencyCap(raw: string | undefined): { value: number; warning?: string } {
+  const n = Number(raw);
+  const valid =
+    raw !== undefined && raw.trim() !== '' &&
+    Number.isInteger(n) && n >= CONCURRENCY_CAP_MIN && n <= CONCURRENCY_CAP_MAX;
+  if (valid) return { value: n };
+  return {
+    value: CONCURRENCY_CAP_DEFAULT,
+    warning: `CONCURRENCY_CAP invalid or unset (${String(raw)}); using default ${CONCURRENCY_CAP_DEFAULT}`,
+  };
+}
+
+const concurrency = resolveConcurrencyCap(process.env.CONCURRENCY_CAP);
+if (concurrency.warning) console.warn(`[config] ${concurrency.warning}`); // warn, do not abort (Req 2.4)
+
 export const config = {
   // Deployed configuration runs API and Worker as separate processes (5.10);
   // local dev keeps the single-process experience by running the worker in-process.
@@ -15,6 +38,8 @@ export const config = {
   runWorkerInProcess: boolEnv(process.env.RUN_WORKER_IN_PROCESS, !isDeployed),
   port: Number(process.env.PORT ?? 4000),
   rateLimitAnonPerDay: Number(process.env.RATE_LIMIT_ANON_PER_DAY ?? 10),
+  // bounded-concurrency cap for parallel evidence lookups; shared by API and worker (Req 2.6)
+  concurrencyCap: concurrency.value,
   // infra drivers
   repoDriver: process.env.REPO_DRIVER ?? 'memory', // memory | postgres
   cacheDriver: process.env.CACHE_DRIVER ?? 'memory', // memory | upstash

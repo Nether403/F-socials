@@ -27,6 +27,7 @@
 
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { performance } from 'node:perf_hooks';
 import type { EvidenceOutcome, SourceTier, ValidatedCandidate } from '../../types';
 import type { CandidateValidator, ClaimNormalizer, EvidenceProvider } from '../../providers/types';
 import { QueryPackGenerator } from '../queryPack';
@@ -235,6 +236,52 @@ export function makeRouterStrategy(deps: RouterStrategyDeps): Strategy {
   };
 }
 
+// ── Cache-miss latency benchmark (Req 7.1, 7.3, 7.4; design "Benchmark p95 reporting") ──
+
+// Nearest-rank p95 over a non-empty sample of millisecond latencies. The rank for
+// percentile p is ceil(p/100 * n) (clamped to [1, n]); the value at that 1-based rank
+// (0-based index rank-1) is the percentile. Pure → property tested (Property 7).
+// Precondition: `sortedAscMs` is non-empty and sorted ascending (the caller sorts).
+export function percentile(sortedAscMs: number[], p: number): number {
+  const n = sortedAscMs.length;
+  const rank = Math.ceil((p / 100) * n);
+  const idx = Math.min(Math.max(rank, 1), n) - 1;
+  return sortedAscMs[idx]!;
+}
+
+export interface LatencyBenchmarkReport {
+  latenciesMs: number[]; // per-run end-to-end latency, in run order (Req 7.3)
+  p95Ms: number; // aggregate cache-miss 95th percentile (Req 7.3)
+  thresholdMs: number; // ship-gate threshold, default 30_000
+  passed: boolean; // p95Ms <= thresholdMs (Req 7.1 ship gate)
+}
+
+// Run `runOnce` (a Cache_Miss pipeline execution with the cache cleared) at least `runs`
+// (floored at 20, Req 7.1) times, timing each with the injected clock, then sort the
+// samples and report latencies + nearest-rank p95 + pass/fail. The clock is injected
+// (defaults to performance.now) so the aggregation logic is deterministically testable
+// without real time. A run whose lookups fail still contributes its measured latency
+// (Req 7.4): `runOnce` is the whole pipeline and `verifyClaim` is total, so it never
+// throws on a lookup failure — the run completes and is timed regardless.
+export async function runLatencyBenchmark(
+  runOnce: () => Promise<void>,
+  opts: { runs: number; thresholdMs?: number; now?: () => number },
+): Promise<LatencyBenchmarkReport> {
+  const thresholdMs = opts.thresholdMs ?? 30_000;
+  const now = opts.now ?? (() => performance.now());
+  const runs = Math.max(20, Math.floor(opts.runs));
+
+  const latenciesMs: number[] = [];
+  for (let i = 0; i < runs; i++) {
+    const start = now();
+    await runOnce();
+    latenciesMs.push(now() - start);
+  }
+
+  const p95Ms = percentile([...latenciesMs].sort((a, b) => a - b), 95);
+  return { latenciesMs, p95Ms, thresholdMs, passed: p95Ms <= thresholdMs };
+}
+
 // ponytail: one runnable self-check (run `node --import tsx src/router/benchmark/runner.ts`).
 // Full property coverage is tasks 12.3–12.5; this only fails fast if FER, the
 // Ship_Gate, or the extraction-held-constant guarantee regress. Uses synthetic claims
@@ -301,6 +348,51 @@ if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   assert.equal(routerFer, 0); // cited nothing → no false evidence
   assert.ok(currentFer > 0); // cited a bad/absent URL for at least one claim
   assert.equal(report.approved, true); // router (0) ≤ current → ship
+
+  // p95 latency reporting (Req 7.3, Property 7). Nearest-rank: p95 of [1..20] has
+  // rank ceil(0.95*20)=19 → value 19. Single-element and tie samples are also exact.
+  assert.equal(
+    percentile(
+      Array.from({ length: 20 }, (_, k) => k + 1),
+      95,
+    ),
+    19,
+  );
+  assert.equal(percentile([42], 95), 42); // any percentile of a singleton is that element
+  assert.equal(percentile([10, 10, 10], 95), 10);
+
+  // runLatencyBenchmark with an injected clock: a fixed 10ms-per-run fake clock yields
+  // 20 equal latencies, p95 = 10, and passed = (10 <= threshold). No real time elapses.
+  const STEP = 10;
+  let fakeT = 0;
+  const fakeClock = () => {
+    const cur = fakeT;
+    fakeT += STEP;
+    return cur;
+  };
+  const fast = await runLatencyBenchmark(async () => {}, { runs: 20, now: fakeClock });
+  assert.equal(fast.latenciesMs.length, 20); // ran exactly the requested runs
+  assert.ok(fast.latenciesMs.every((ms) => ms === STEP)); // each run measured one clock step
+  assert.equal(fast.p95Ms, STEP);
+  assert.equal(fast.thresholdMs, 30_000); // documented default threshold
+  assert.equal(fast.passed, true); // 10 <= 30_000
+
+  // A failing run still completes and contributes its latency (Req 7.4): runOnce rejects
+  // → it would throw; the WHOLE pipeline never throws on a lookup failure, so here we model
+  // a slow-but-completing run and check passed flips false when p95 exceeds the threshold.
+  fakeT = 0;
+  const slow = await runLatencyBenchmark(async () => {}, {
+    runs: 20,
+    thresholdMs: STEP - 1,
+    now: fakeClock,
+  });
+  assert.equal(slow.p95Ms, STEP);
+  assert.equal(slow.passed, false); // 10 <= 9 is false → ship gate fails
+
+  // `runs` is floored at the Req 7.1 minimum of 20 even if a smaller count is requested.
+  fakeT = 0;
+  const floored = await runLatencyBenchmark(async () => {}, { runs: 5, now: fakeClock });
+  assert.equal(floored.latenciesMs.length, 20);
 
   console.log('runner.ts self-check passed');
 }

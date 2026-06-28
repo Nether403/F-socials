@@ -6,6 +6,7 @@ import type { Cache, Job, Repository } from '../infra/ports';
 import type { AnalysisReport } from '../types';
 import { runPipeline } from './stages';
 import { assertInvariantGateIntact } from '../router/guard';
+import { config } from '../config';
 
 function shortSlug(): string {
   return randomUUID().replace(/-/g, '').slice(0, 10);
@@ -34,7 +35,7 @@ export function makeWorker(deps: {
     console.log(`[worker] ${job.reportId} -> processing`);
 
     try {
-      const result = await runPipeline(job.input, deps.providers);
+      const result = await runPipeline(job.input, deps.providers, config.concurrencyCap);
       const finishedAt = new Date().toISOString();
       const finished: AnalysisReport = {
         ...existing,

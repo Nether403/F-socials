@@ -30,6 +30,7 @@ import type {
   ValidatedCandidate,
 } from '../types';
 import type { CandidateValidator, ClaimNormalizer } from '../providers/types';
+import { Semaphore } from '../concurrency';
 import { triage } from './normalize';
 import { QueryPackGenerator } from './queryPack';
 import { safeValidate } from './validate';
@@ -52,6 +53,7 @@ export interface VerifyDeps {
   validator: CandidateValidator;
   retrieve: (variant: QueryVariant) => Promise<Candidate[]>;
   classifyTier: (sourceUrl: string) => SourceTier; // classifyCitationTier
+  semaphore?: Semaphore; // shared per-report scheduler; absent ⇒ standalone cap-1 (back-compat)
 }
 
 // What Stage 3 of the pipeline consumes to build a Claim plus the report's context
@@ -109,17 +111,26 @@ export async function verifyClaim(originalClaim: string, deps: VerifyDeps): Prom
   // Stage 3: query pack from the Canonical_Claim (Req 2.5).
   const queryPack = QueryPackGenerator.generate(normalized.canonicalClaim);
 
-  // Stage 4: retrieve per variant. A variant whose retrieval throws contributes zero
-  // candidates (design error handling); if every variant fails, candidates stays empty
-  // and the outcome resolves to no_sufficient_evidence below (a served outcome, Req 7.3).
-  const candidates: Candidate[] = [];
-  for (const variant of queryPack) {
-    try {
-      candidates.push(...(await deps.retrieve(variant)));
-    } catch {
-      // zero candidates for this variant
-    }
-  }
+  // Stage 4: retrieve per variant, in parallel, gated by the shared semaphore. Results
+  // are written into perVariant[j] so completion order never affects candidate order
+  // (Req 3.4); a variant whose retrieval throws contributes zero candidates (Req 4.2),
+  // and if every variant fails candidates stays empty and the outcome resolves to
+  // no_sufficient_evidence below (a served outcome, Req 7.3). normalize/triage already
+  // ran outside the semaphore, so a not_fact_checkable claim short-circuits with zero
+  // acquisitions (Req 5.3). Absent a shared semaphore, a standalone cap-1 keeps the
+  // serial baseline behavior (back-compat).
+  const sem = deps.semaphore ?? new Semaphore(1);
+  const perVariant: Candidate[][] = new Array(queryPack.length);
+  await Promise.all(
+    queryPack.map(async (variant, j) => {
+      try {
+        perVariant[j] = await sem.run(() => deps.retrieve(variant)); // 1 acquire = 1 Provider_Chain submission
+      } catch {
+        perVariant[j] = []; // zero candidates for this variant
+      }
+    }),
+  );
+  const candidates: Candidate[] = perVariant.flat(); // variant-index order, then in-variant order (Req 3.4)
 
   // Stage 5: validate each candidate against the ORIGINAL claim (Req 3.2), never the
   // variant text. safeValidate clamps out-of-range confidence and treats a throw as

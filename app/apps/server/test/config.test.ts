@@ -57,3 +57,52 @@ test('Property 16: dev mode gates nothing regardless of env', () => {
     { numRuns: 200 },
   );
 });
+
+// Feature: parallel-evidence-lookups, Property 8: Concurrency-cap resolution —
+// across all invalid classes (absent / empty / non-numeric / non-integer / <1 / >32)
+// resolveConcurrencyCap falls back to the default 4 with a warning naming the
+// CONCURRENCY_CAP variable; integers in [1,32] pass through unchanged with no warning.
+// Validates: Requirements 2.2, 2.3, 2.4.
+
+import { resolveConcurrencyCap, CONCURRENCY_CAP_DEFAULT } from '../src/config';
+
+// Valid class: an integer in the inclusive range [1, 32].
+const validRaw = fc.integer({ min: 1, max: 32 }).map((n) => String(n));
+
+// Invalid classes, each generated independently then unioned.
+const invalidRaw = fc.oneof(
+  fc.constant<string | undefined>(undefined), // absent
+  fc.constant(''), // empty
+  fc.constantFrom('   ', '\t'), // whitespace-only (empty after trim)
+  fc.string().filter((s) => Number.isNaN(Number(s)) && s.trim() !== ''), // non-numeric
+  fc.float({ min: 1, max: 32, noNaN: true }).filter((n) => !Number.isInteger(n)).map(String), // non-integer
+  fc.integer({ max: 0 }).map(String), // < 1
+  fc.integer({ min: 33 }).map(String), // > 32
+);
+
+test('Property 8: integers in [1,32] pass through with no warning', () => {
+  fc.assert(
+    fc.property(validRaw, (raw) => {
+      const result = resolveConcurrencyCap(raw);
+      assert.equal(result.value, Number(raw));
+      assert.equal(result.warning, undefined);
+    }),
+    { numRuns: 200 },
+  );
+});
+
+test('Property 8: invalid input falls back to default 4 with a CONCURRENCY_CAP warning', () => {
+  fc.assert(
+    fc.property(invalidRaw, (raw) => {
+      const result = resolveConcurrencyCap(raw);
+      assert.equal(result.value, CONCURRENCY_CAP_DEFAULT);
+      assert.equal(result.value, 4);
+      assert.ok(result.warning, 'expected a warning for invalid input');
+      assert.ok(
+        result.warning!.includes('CONCURRENCY_CAP'),
+        `warning should name CONCURRENCY_CAP, got: ${result.warning}`,
+      );
+    }),
+    { numRuns: 200 },
+  );
+});
