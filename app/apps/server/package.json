@@ -10,16 +10,18 @@
     "start": "node dist/index.js",
     "start:worker": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts test/config.test.ts test/cors.test.ts test/sourceTier.totality.test.ts test/sourceTier.signals.test.ts test/sourceSignals.provenance.test.ts test/gate.uncited.test.ts test/gate.honestNone.test.ts test/gate.framing.test.ts test/gate.readiness.test.ts test/gate.tierNeutral.test.ts test/servedTiers.test.ts test/dispute.persist.test.ts test/flag.persist.test.ts test/flag.unauth.test.ts test/missingReport.test.ts test/invalidBody.test.ts test/protectedRoutes.test.ts test/reportGraph.dualwrite.test.ts test/reportGraph.cardinality.test.ts test/reportGraph.roundtrip.test.ts test/reportGraph.retain.test.ts test/reportGraph.idempotent.test.ts test/reportGraph.neutrality.prop.test.ts test/reportGraph.gateReflect.test.ts test/reportGraph.backfill.test.ts test/reportGraph.backfillFailure.test.ts test/reportGraph.durability.test.ts test/reportGraph.offlineWiring.test.ts test/reportGraph.neutralityStatic.test.ts test/reportGraph.guards.test.ts test/reportGraph.parity.test.ts \"test/router/**/*.test.ts\"",
+    "test": "node --import tsx --test test/invariant.test.ts test/evidence.test.ts test/youtube.test.ts test/perspective.test.ts test/ratelimit.test.ts test/auth.test.ts test/config.test.ts test/kpi.agreement.test.ts test/telemetry.noop.test.ts test/cors.test.ts test/telemetry.redact.preserve.test.ts test/sourceTier.totality.test.ts test/sourceTier.signals.test.ts test/sourceSignals.provenance.test.ts test/gate.uncited.test.ts test/gate.honestNone.test.ts test/gate.framing.test.ts test/gate.readiness.test.ts test/gate.tierNeutral.test.ts test/servedTiers.test.ts test/dispute.persist.test.ts test/flag.persist.test.ts test/flag.unauth.test.ts test/missingReport.test.ts test/invalidBody.test.ts test/protectedRoutes.test.ts test/reportGraph.dualwrite.test.ts test/reportGraph.cardinality.test.ts test/reportGraph.roundtrip.test.ts test/reportGraph.retain.test.ts test/reportGraph.idempotent.test.ts test/reportGraph.neutrality.prop.test.ts test/reportGraph.gateReflect.test.ts test/reportGraph.backfill.test.ts test/reportGraph.backfillFailure.test.ts test/reportGraph.durability.test.ts test/reportGraph.offlineWiring.test.ts test/reportGraph.neutralityStatic.test.ts test/reportGraph.guards.test.ts test/reportGraph.parity.test.ts test/telemetry.redact.noDenied.test.ts test/telemetry.redact.idempotent.test.ts test/telemetry.redact.totality.test.ts test/telemetry.neutrality.test.ts test/kpi.citationCoverage.test.ts test/telemetry.failopen.test.ts test/telemetry.select.test.ts test/telemetry.port.wiring.test.ts test/telemetry.callsites.test.ts test/telemetry.context.test.ts test/telemetry.invariance.test.ts \"test/router/**/*.test.ts\"",
     "test:build": "node --import tsx --test test/build.smoke.test.ts test/degraded.test.ts",
     "test:integration": "node --import tsx --test test/reportGraph.migration.test.ts test/reportGraph.atomicity.test.ts test/reportGraph.crossReport.test.ts"
   },
   "dependencies": {
+    "@sentry/node": "10.62.0",
     "bullmq": "^5.79.1",
     "express": "^5.1.0",
     "ioredis": "^5.11.1",
     "jose": "^6.2.3",
     "pg": "^8.22.0",
+    "posthog-node": "5.38.6",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -15,6 +15,7 @@ import {
   InMemoryRateLimiter,
   InMemoryRepository,
 } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { AnalysisReport } from '../src/types';
 
 function buildApp() {
@@ -24,7 +25,7 @@ function buildApp() {
   const limiter = new InMemoryRateLimiter(10);
   const app = express()
     .use(express.json())
-    .use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter }));
+    .use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
   return { app, repo };
 }
 

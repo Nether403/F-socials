@@ -13,6 +13,7 @@ import fc from 'fast-check';
 
 import { makeRouter } from '../src/http/routes';
 import { InMemoryCache, InMemoryQueue, InMemoryRateLimiter, InMemoryRepository } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { AnalysisReport } from '../src/types';
 
 const REPORT_ID = 'report-under-test';
@@ -59,6 +60,7 @@ test('Property 5: a valid anonymous dispute is persisted with no user identity',
         cache: new InMemoryCache(),
         queue: new InMemoryQueue(),
         limiter: new InMemoryRateLimiter(1000),
+        telemetry: noopTelemetry,
       }),
     );
 

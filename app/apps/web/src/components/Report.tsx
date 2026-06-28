@@ -23,6 +23,7 @@ import type {
   Verifiability,
 } from '../api/types';
 import { submitFlag } from '../api/client';
+import { track } from '../analytics';
 import { DisputeModal } from './DisputeModal';
 
 // Neutral, non-verdict mapping: evidenceStrength = how much external review exists.
@@ -135,6 +136,7 @@ export function Report({
   function onFlag(technique: string) {
     gated('flag a framing technique', () => {
       // Only reachable when authenticated; the endpoint enforces requireAuth too (3.3, 3.4).
+      track('flag', { reportId: report.id }); // Web_Analytics interaction event (Req 12.2)
       void submitFlag(report.id, { technique }).catch(() => {
         /* surfacing flag-submit errors is out of scope for this task */
       });
@@ -164,7 +166,7 @@ export function Report({
           >
             {saved ? <Check size={15} /> : <Bookmark size={15} />} {saved ? 'Saved' : 'Save'}
           </button>
-          {report.shareSlug && <ShareButton slug={report.shareSlug} />}
+          {report.shareSlug && <ShareButton slug={report.shareSlug} reportId={report.id} />}
         </div>
       </div>
 
@@ -273,7 +275,7 @@ function Tabbtn(props: { id: Tab; tab: Tab; setTab: (t: Tab) => void; label: str
   );
 }
 
-function ShareButton({ slug }: { slug: string }) {
+function ShareButton({ slug, reportId }: { slug: string; reportId: string }) {
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}/#/r/${slug}`;
   return (
@@ -281,6 +283,7 @@ function ShareButton({ slug }: { slug: string }) {
       className="btn btn-ghost"
       style={{ height: 38, padding: '0 14px', flexShrink: 0 }}
       onClick={async () => {
+        track('share', { reportId }); // Web_Analytics interaction event (Req 12.2)
         try {
           await navigator.clipboard.writeText(link);
         } catch {

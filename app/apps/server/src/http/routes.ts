@@ -2,14 +2,14 @@
 
 import { randomUUID } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
-import type { Cache, Queue, RateLimiter, Repository } from '../infra/ports';
+import type { Cache, Queue, RateLimiter, Repository, Telemetry } from '../infra/ports';
 import type { AnalysisReport, ContentItem, RawInput } from '../types';
 import { cacheKey } from '../core/hash';
 import { policyDescriptor } from '../core/sourceTier';
 import { submitSchema, disputeSchema, flagSchema } from './validation';
 import { requireAuth } from './auth';
 
-export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter }): Router {
+export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter; telemetry: Telemetry }): Router {
   const router = Router();
 
   const paramId = (req: Request): string | undefined => {
@@ -34,6 +34,7 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     // 1. Cache hit -> serve the existing ready report (does NOT consume quota).
     const cached = await deps.cache.get(hash);
     if (cached) {
+      deps.telemetry.emit('cache_hit', { submissionId: hash, cached: true });
       return res.status(200).json({ reportId: cached.id, status: cached.status, cached: true });
     }
 
@@ -85,6 +86,7 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     };
     await deps.repo.saveReport(report);
     await deps.queue.enqueue({ reportId: report.id, contentId: content.id, urlHash: hash, input });
+    deps.telemetry.emit('cache_miss', { submissionId: hash });
 
     return res.status(202).json({ reportId: report.id, status: report.status, cached: false });
   });
@@ -125,6 +127,7 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
       reason: parsed.data.reason,
       createdAt: new Date().toISOString(),
     });
+    deps.telemetry.emit('dispute', { reportId: id, claimId: parsed.data.claimId });
     return res.status(201).json({ ok: true });
   });
 
@@ -155,6 +158,8 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
       note: parsed.data.note,
       createdAt: new Date().toISOString(),
     });
+    // No user id is ever emitted — flag has no claimId, so the event carries the report id only.
+    deps.telemetry.emit('flag', { reportId: id });
     return res.status(201).json({ ok: true });
   });
 

@@ -55,3 +55,17 @@ export interface RateLimiter {
   // Records one hit for `key` and reports whether it's within the limit.
   hit(key: string): Promise<RateLimitResult>;
 }
+
+// Telemetry: error monitoring (Error_Monitor) + product analytics (Product_Analytics)
+// behind one port, mirroring Cache/Queue/Repository/RateLimiter. Methods are
+// synchronous void and fire-and-forget: callers never block or await telemetry, and
+// a telemetry fault never propagates (fail-open). The composition root picks the
+// concrete impl from .env (compose.ts selectTelemetry).
+export interface Telemetry {
+  // Product_Analytics. `name` is a Telemetry_Event name; `props` is a bag of ids and
+  // metrics only. Passed through Redactor AND Neutrality_Guard before emission.
+  emit(name: string, props?: Record<string, unknown>): void;
+  // Error_Monitor. Captures an error with structured context (reportId, stage,
+  // providerCategory, …). Passed through Redactor before emission.
+  capture(error: unknown, context?: Record<string, unknown>): void;
+}

@@ -40,6 +40,7 @@ import type { AddressInfo } from 'node:net';
 import { optionalAuth } from '../src/http/auth';
 import { makeRouter } from '../src/http/routes';
 import { InMemoryCache, InMemoryQueue, InMemoryRepository } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 
 test('POST /api/v1/analyses returns 429 once the daily new-analysis limit is exceeded', async () => {
   const repo = new InMemoryRepository();
@@ -49,7 +50,7 @@ test('POST /api/v1/analyses returns 429 once the daily new-analysis limit is exc
 
   const app = express()
     .use(express.json())
-    .use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter }));
+    .use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
 
   const server = app.listen(0);
   try {

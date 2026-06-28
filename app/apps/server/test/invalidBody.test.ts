@@ -19,6 +19,7 @@ import fc from 'fast-check';
 
 import { makeRouter } from '../src/http/routes';
 import { InMemoryCache, InMemoryQueue, InMemoryRateLimiter, InMemoryRepository } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { AnalysisReport } from '../src/types';
 
 const REPORT_ID = 'report-1';
@@ -67,6 +68,7 @@ function buildApp(repo: InMemoryRepository) {
       cache: new InMemoryCache(),
       queue: new InMemoryQueue(),
       limiter: new InMemoryRateLimiter(1_000_000),
+      telemetry: noopTelemetry,
     }),
   );
   return app;

@@ -14,6 +14,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import fc from 'fast-check';
 import { makeRouter } from '../src/http/routes';
 import { InMemoryCache, InMemoryQueue, InMemoryRepository, InMemoryRateLimiter } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { AnalysisReport, FramingSignal } from '../src/types';
 
 const USER = { id: 'user-1', email: 'u@x.test', role: 'authenticated' as const };
@@ -61,7 +62,7 @@ test('authenticated, technique-matched flag is persisted to the report and user'
 
   const app = express();
   app.use(express.json());
-  app.use('/api/v1', authStub, makeRouter({ repo, cache, queue, limiter }));
+  app.use('/api/v1', authStub, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
 
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));

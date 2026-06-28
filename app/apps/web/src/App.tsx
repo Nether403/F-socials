@@ -1,6 +1,7 @@
 import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { detectInput, getReportBySlug, pollReport, submitAnalysis } from './api/client';
+import { track } from './analytics';
 import type { AnalysisReport } from './api/types';
 import { Report } from './components/Report';
 import { Methodology } from './components/Methodology';
@@ -78,6 +79,9 @@ export default function App() {
   // Remember the last attempted request so the error view's Retry can re-run it,
   // whether the failure came from a fresh analysis (run) or a shared-report load (4.2).
   const lastAttemptRef = useRef<(() => void) | null>(null);
+  // The last view we emitted a 'view' analytics event for, so each distinct view
+  // (route + report id) emits exactly once despite re-renders / StrictMode double-invoke.
+  const lastViewKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -137,6 +141,21 @@ export default function App() {
     }, 1600);
     return () => window.clearInterval(stepTimer.current);
   }, [view.kind]);
+
+  // Web_Analytics: emit exactly one 'view' event per distinct view, identified by
+  // route + report id only (Req 12.1). A ref-guarded key dedupes re-renders and
+  // React StrictMode's dev double-invoke. track() is consent-gated and a no-op
+  // without a key, with no render side effects, so the DOM/routing/a11y are
+  // identical whether analytics is active or not (Req 12.8).
+  useEffect(() => {
+    const route =
+      view.kind === 'report' ? (view.shared ? '#/r' : '#/report') : `#/${view.kind}`;
+    const reportId = view.kind === 'report' ? view.report.id : undefined;
+    const key = `${route}:${reportId ?? ''}`;
+    if (lastViewKeyRef.current === key) return;
+    lastViewKeyRef.current = key;
+    track('view', { route, reportId });
+  }, [view]);
 
   async function run(text: string) {
     const trimmed = text.trim();

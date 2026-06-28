@@ -6,12 +6,13 @@ import { config } from './config';
 import { buildContext } from './compose';
 import { makeWorker } from './pipeline/worker';
 
-const { repo, cache, queue, providers, meta } = buildContext();
+const { repo, cache, queue, telemetry, providers, meta } = buildContext();
 
 queue.process(
   makeWorker({
     repo,
     cache,
+    telemetry,
     providers,
     meta,
   }),

@@ -13,6 +13,7 @@ import express from 'express';
 import fc from 'fast-check';
 import { makeRouter } from '../src/http/routes';
 import { InMemoryRepository } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { Cache, Queue, RateLimiter } from '../src/infra/ports';
 
 // Unused by the dispute/flag routes, but makeRouter requires the full dep set.
@@ -43,7 +44,7 @@ test('disputes and flags on a nonexistent report 404 and persist nothing', async
   const app = express();
   app.use(express.json());
   // Stub auth before the router so requireAuth passes and the 404 is reached.
-  app.use('/api/v1', authStub, makeRouter({ repo, cache, queue, limiter }));
+  app.use('/api/v1', authStub, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, resolve));

@@ -74,7 +74,19 @@ export const config = {
     anonKey: process.env.SUPABASE_ANON_KEY ?? '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   },
+  // Telemetry (observability): read once here, shared byte-for-byte by API and Worker.
+  // Verbatim trimmed env value, or '' when unset or whitespace-only (Req 2.2, 2.3, 2.4).
+  // An empty string classifies the backend as not configured (Req 2.5, see isTelemetryConfigured).
+  // Deliberately NOT added to missingRequiredConfig — absent telemetry never blocks startup (Req 3.3).
+  sentryDsn: (process.env.SENTRY_DSN ?? '').trim(),
+  posthogKey: (process.env.POSTHOG_KEY ?? '').trim(),
 };
+
+// A telemetry backend is "configured" only when its config value is a non-empty string;
+// '' (unset or whitespace-only) ⇒ not configured, so the backend is skipped (Req 2.5, 2.6).
+export function isTelemetryConfigured(value: string): boolean {
+  return value !== '';
+}
 
 type Env = Record<string, string | undefined>;
 

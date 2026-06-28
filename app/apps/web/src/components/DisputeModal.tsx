@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { submitDispute } from '../api/client';
+import { track } from '../analytics';
 
 const MAX = 2000; // mirror the server's disputeSchema reason bound (1..2000)
 
@@ -71,6 +72,7 @@ export function DisputeModal({
     setError(null);
     try {
       await submitDispute(reportId, { reason: trimmed, claimId });
+      track('dispute', { reportId }); // Web_Analytics interaction event (Req 12.2)
       setDone(true);
     } catch (err) {
       // Inline error, modal stays open so the user can retry (3.9 failure path).

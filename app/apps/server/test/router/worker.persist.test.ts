@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 
 import { makeWorker } from '../../src/pipeline/worker';
 import { InMemoryCache, InMemoryRepository } from '../../src/infra/memory';
+import { noopTelemetry } from '../../src/infra/telemetry/noop';
 import {
   mockEvidence,
   mockLLM,
@@ -54,7 +55,7 @@ function seedReport(repo: InMemoryRepository, id: string): Promise<void> {
 
 test('makeWorker runs the invariant-gate boot guard without throwing', () => {
   // The real assembleReport still holds its pinned behavior, so construction succeeds.
-  assert.doesNotThrow(() => makeWorker({ repo: new InMemoryRepository(), cache: new InMemoryCache(), providers, meta }));
+  assert.doesNotThrow(() => makeWorker({ repo: new InMemoryRepository(), cache: new InMemoryCache(), telemetry: noopTelemetry, providers, meta }));
 });
 
 test('worker persists an AuditRecord per claim and does not fail the report', async () => {
@@ -70,7 +71,7 @@ test('worker persists an AuditRecord per claim and does not fail the report', as
   };
   const job: Job = { reportId, contentId: 'content-1', urlHash: 'hash-1', input };
 
-  const handleJob = makeWorker({ repo, cache, providers, meta });
+  const handleJob = makeWorker({ repo, cache, telemetry: noopTelemetry, providers, meta });
   await handleJob(job);
 
   const finished = await repo.getReport(reportId);

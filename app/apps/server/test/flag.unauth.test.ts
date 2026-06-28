@@ -17,6 +17,7 @@ import {
   InMemoryQueue,
   InMemoryRateLimiter,
 } from '../src/infra/memory';
+import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { AnalysisReport } from '../src/types';
 
 // A ready report carrying real framing techniques, so a "valid-looking" technique
@@ -67,6 +68,7 @@ test('Property 7: unauthenticated flag submissions are rejected (401) and never 
         cache: new InMemoryCache(),
         queue: new InMemoryQueue(),
         limiter: new InMemoryRateLimiter(100),
+        telemetry: noopTelemetry,
       }),
     );
 

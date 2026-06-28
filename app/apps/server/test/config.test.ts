@@ -106,3 +106,78 @@ test('Property 8: invalid input falls back to default 4 with a CONCURRENCY_CAP w
     { numRuns: 200 },
   );
 });
+
+// Feature: observability-instrumentation, Property 12: Telemetry config never blocks startup.
+// Validates: Requirements 3.3, 2.2, 2.3, 2.4.
+//
+// (a) For any env, in any mode, missingRequiredConfig never reports SENTRY_DSN or
+//     POSTHOG_KEY as a required-but-absent name — absent telemetry config can never
+//     block startup (Req 3.3).
+// (b) The exposed telemetry config values are the verbatim trimmed env string, or ''
+//     when the variable is unset or whitespace-only (Req 2.2, 2.3, 2.4), and the
+//     not-configured classification is exactly the empty-string case (Req 2.5).
+
+import { config, isTelemetryConfigured } from '../src/config';
+
+const TELEMETRY_VARS = ['SENTRY_DSN', 'POSTHOG_KEY'] as const;
+
+// Arbitrary raw env value: unset, empty, whitespace-only, or a string that may carry
+// surrounding whitespace around non-empty content.
+const rawEnvValue = fc.oneof(
+  fc.constant<string | undefined>(undefined),
+  fc.constant(''),
+  fc.constantFrom('   ', '\t', '\n', ' \t \n '), // whitespace-only -> '' after trim
+  fc.string().map((s) => `  ${s}  `), // padded; may be whitespace-only or non-empty
+  fc.string({ minLength: 1 }), // arbitrary, possibly already trimmed
+);
+
+// Spec derivation: verbatim trimmed string, or '' when unset (Req 2.2/2.3/2.4).
+const telemetryConfigValue = (raw: string | undefined): string => (raw ?? '').trim();
+
+// An env that includes the config fields missingRequiredConfig inspects PLUS arbitrary
+// telemetry vars, so we can assert the telemetry vars never leak into the result.
+const envWithTelemetry = fc.record({
+  REPO_DRIVER: fc.constantFrom('postgres', 'memory', undefined),
+  CACHE_DRIVER: fc.constantFrom('upstash', 'memory', undefined),
+  QUEUE_DRIVER: fc.constantFrom('upstash', 'memory', undefined),
+  DATABASE_URL: presence,
+  REDIS_URL: presence,
+  CORS_ORIGIN: presence,
+  SENTRY_DSN: rawEnvValue,
+  POSTHOG_KEY: rawEnvValue,
+});
+
+test('Property 12: telemetry vars never appear in missingRequiredConfig, in any mode', () => {
+  fc.assert(
+    fc.property(envWithTelemetry, fc.constantFrom<'deployed' | 'dev'>('deployed', 'dev'), (env, mode) => {
+      const missing = missingRequiredConfig(env, mode);
+      for (const name of TELEMETRY_VARS) {
+        assert.ok(!missing.includes(name), `${name} must never block startup (mode=${mode})`);
+      }
+    }),
+    { numRuns: 200 },
+  );
+});
+
+test('Property 12: telemetry config is the verbatim trimmed value, or "" when unset/whitespace-only', () => {
+  fc.assert(
+    fc.property(rawEnvValue, (raw) => {
+      const value = telemetryConfigValue(raw);
+      // verbatim trimmed (Req 2.2, 2.3)
+      assert.equal(value, (raw ?? '').trim());
+      // unset or whitespace-only -> '' (Req 2.4)
+      const isBlank = raw === undefined || raw.trim() === '';
+      assert.equal(value === '', isBlank);
+      // not-configured classification is exactly the empty-string case (Req 2.5)
+      assert.equal(isTelemetryConfigured(value), !isBlank);
+    }),
+    { numRuns: 200 },
+  );
+});
+
+test('Property 12: exposed config values match the verbatim trimmed env (single-read, no drift)', () => {
+  // config reads SENTRY_DSN/POSTHOG_KEY once at module init; assert the exposed values
+  // equal the verbatim trimmed env strings the spec mandates (Req 2.2, 2.3, 2.4, 2.7).
+  assert.equal(config.sentryDsn, telemetryConfigValue(process.env.SENTRY_DSN));
+  assert.equal(config.posthogKey, telemetryConfigValue(process.env.POSTHOG_KEY));
+});

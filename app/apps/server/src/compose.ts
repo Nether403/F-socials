@@ -3,11 +3,20 @@
 // buildContext() so they wire identical infra/providers.
 // Swap any in-memory infra or mock provider here when you move to real services.
 
-import { config } from './config';
+import { config, isTelemetryConfigured } from './config';
 import { InMemoryCache, InMemoryQueue, InMemoryRateLimiter, InMemoryRepository } from './infra/memory';
 import { PostgresRepository, makePgPool } from './infra/postgres';
 import { RedisCache, RedisQueue, RedisRateLimiter, makeRedisConnection } from './infra/redis';
-import type { Cache, Queue, RateLimiter, Repository } from './infra/ports';
+import type { Cache, Queue, RateLimiter, Repository, Telemetry } from './infra/ports';
+import { noopTelemetry } from './infra/telemetry/noop';
+import {
+  makeActiveTelemetry,
+  initSentry,
+  initPosthog,
+  type ActiveTelemetryDeps,
+  type SentryBackend,
+  type PostHogBackend,
+} from './infra/telemetry/active';
 import type { EvidenceProvider, LLMProvider, PerspectiveProvider, Providers } from './providers/types';
 import { mockEvidence, mockLLM, mockNormalizer, mockPerspective, mockValidator } from './providers/mock';
 import { makeGeminiLLM } from './providers/gemini';
@@ -60,6 +69,68 @@ function selectQueue(): Queue {
   }
   console.log('[infra] Queue: in-memory');
   return new InMemoryQueue();
+}
+
+// --- telemetry selection (SENTRY_DSN / POSTHOG_KEY in .env) ---
+// Mirrors the select* infra functions: each concern (Error_Monitor / Product_Analytics)
+// is independently active when its credential is non-empty, else a no-op for that method.
+// Both unconfigured ⇒ the shared frozen noopTelemetry. Exactly one [infra] startup log
+// names the selection (or `no-op`); a warning names any absent backend; init failure
+// degrades to no-op without aborting. Never enters missingRequiredConfig (Req 3.3).
+//
+// The optional `overrides` exist ONLY so the selection logic is testable without real
+// vendor-SDK init (task 5.4): they default to the shared `config` values and the real
+// init helpers, so the production call `selectTelemetry()` is unchanged in behaviour.
+export interface SelectTelemetryOverrides {
+  sentryDsn?: string;
+  posthogKey?: string;
+  initSentry?: (dsn: string) => SentryBackend;
+  initPosthog?: (key: string) => PostHogBackend;
+}
+
+export function selectTelemetry(overrides: SelectTelemetryOverrides = {}): Telemetry {
+  const sentryDsn = overrides.sentryDsn ?? config.sentryDsn;
+  const posthogKey = overrides.posthogKey ?? config.posthogKey;
+  const buildSentry = overrides.initSentry ?? initSentry;
+  const buildPosthog = overrides.initPosthog ?? initPosthog;
+
+  const sentryConfigured = isTelemetryConfigured(sentryDsn);
+  const posthogConfigured = isTelemetryConfigured(posthogKey);
+
+  // Warn naming each absent telemetry variable (Req 1.7, 3.2, 3.6) — degrade, never abort.
+  const absent: string[] = [];
+  if (!sentryConfigured) absent.push('SENTRY_DSN (Error_Monitor)');
+  if (!posthogConfigured) absent.push('POSTHOG_KEY (Product_Analytics)');
+  if (absent.length > 0) {
+    console.warn(`[infra] Telemetry: ${absent.join(', ')} absent — degrading those concerns to no-op`);
+  }
+
+  // Both unconfigured ⇒ shared no-op singleton, one [infra] log (Req 1.4, 3.1, 3.2).
+  if (!sentryConfigured && !posthogConfigured) {
+    console.log('[infra] Telemetry: no-op');
+    return noopTelemetry;
+  }
+
+  // Activation behind a try/catch: an SDK init failure warns and falls back to no-op
+  // rather than aborting startup (Req 10.5). The init helpers are the only vendor touch.
+  try {
+    const deps: ActiveTelemetryDeps = {};
+    const selected: string[] = [];
+    if (sentryConfigured) {
+      deps.sentry = buildSentry(sentryDsn);
+      selected.push('Sentry (Error_Monitor)');
+    }
+    if (posthogConfigured) {
+      deps.posthog = buildPosthog(posthogKey);
+      selected.push('PostHog (Product_Analytics)');
+    }
+    console.log(`[infra] Telemetry: ${selected.join(' + ')}`);
+    return makeActiveTelemetry(deps);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[infra] Telemetry: telemetry initialization failure — falling back to no-op (${msg})`);
+    return noopTelemetry;
+  }
 }
 
 // --- LLM provider selection (LLM_PROVIDER in .env) ---
@@ -143,6 +214,7 @@ export interface AppContext {
   cache: Cache;
   queue: Queue;
   limiter: RateLimiter;
+  telemetry: Telemetry;
   providers: Providers;
   meta: WorkerMeta;
 }
@@ -152,6 +224,7 @@ export function buildContext(): AppContext {
   const cache = selectCache();
   const queue = selectQueue();
   const limiter = selectRateLimiter();
+  const telemetry = selectTelemetry();
 
   // --- transcript: YouTube via Supadata if configured, else watch-page (which will
   // error helpfully since YouTube blocks server-side caption fetch). Paste always works. ---
@@ -182,5 +255,5 @@ export function buildContext(): AppContext {
     sourcePolicyVersion: SOURCE_POLICY_VERSION,
   };
 
-  return { repo, cache, queue, limiter, providers, meta };
+  return { repo, cache, queue, limiter, telemetry, providers, meta };
 }
