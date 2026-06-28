@@ -45,3 +45,20 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
   next();
 }
+
+// Admits only a Reviewer. Layered after requireAuth, so a missing/invalid token
+// has already produced 401 (Req 1.2, 1.3). Here we only decide reviewer-or-not.
+export function reviewerGuard(req: Request, res: Response, next: NextFunction): void {
+  const role = config.reviewerRole; // '' when unconfigured
+  if (!role) {
+    // Req 1.6 — fail closed, deny all
+    res.status(403).json({ error: 'reviewer_role_not_configured' });
+    return;
+  }
+  if (req.user?.role !== role) {
+    // Req 1.4 — authenticated non-reviewer
+    res.status(403).json({ error: 'not_a_reviewer' });
+    return;
+  }
+  next(); // Req 1.1
+}

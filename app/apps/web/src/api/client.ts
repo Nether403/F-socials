@@ -1,4 +1,12 @@
-import type { AnalysisReport, PolicyDescriptor, ReportStatus, SourceType } from './types';
+import type {
+  AnalysisReport,
+  PolicyDescriptor,
+  ReportStatus,
+  ResolutionOutcome,
+  ReviewItem,
+  ReviewLifecycle,
+  SourceType,
+} from './types';
 
 const API = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 
@@ -76,6 +84,72 @@ export async function submitFlag(
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? `Could not submit flag (${res.status})`);
   }
+}
+
+// --- Expert review queue (11.1, 11.8) ---------------------------------------
+// All four are behind requireAuth + reviewerGuard on the server; the console gates
+// the calls and resolves 401/403 to the sign-in/error state. They mirror the
+// submitDispute/submitFlag fetch+throw style: throw on any non-ok so the console can
+// surface the message and leave the item unchanged for retry (11.9). The item
+// mutations unwrap the server's { item } envelope to the updated ReviewItem (11.8).
+
+// GET /review/queue with optional ?status= filter; returns the queue (200, [] when
+// empty). Throws on non-ok (e.g. 400 invalid filter, 401/403 unauthorized).
+export async function getReviewQueue(status?: ReviewLifecycle): Promise<ReviewItem[]> {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  const res = await fetch(`${API}/api/v1/review/queue${qs}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `Could not load review queue (${res.status})`);
+  }
+  return res.json();
+}
+
+// POST /review/items/:id/claim; returns the updated item. The id is "{kind}:{sourceId}"
+// and is URL-encoded into the path. Throws on non-ok (404 not found, 409 conflict).
+export async function claimReviewItem(id: string): Promise<ReviewItem> {
+  const res = await fetch(`${API}/api/v1/review/items/${encodeURIComponent(id)}/claim`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `Could not claim review item (${res.status})`);
+  }
+  const body = await res.json();
+  return body.item;
+}
+
+// POST /review/items/:id/release; returns the updated item. Throws on non-ok
+// (404 not found, 409 not actionable / conflict).
+export async function releaseReviewItem(id: string): Promise<ReviewItem> {
+  const res = await fetch(`${API}/api/v1/review/items/${encodeURIComponent(id)}/release`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `Could not release review item (${res.status})`);
+  }
+  const body = await res.json();
+  return body.item;
+}
+
+// POST /review/items/:id/resolution with a JSON body; returns the updated item.
+// Throws on non-ok (400 invalid outcome/note, 404 not found).
+export async function resolveReviewItem(
+  id: string,
+  body: { outcome: ResolutionOutcome; note?: string },
+): Promise<ReviewItem> {
+  const res = await fetch(`${API}/api/v1/review/items/${encodeURIComponent(id)}/resolution`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `Could not submit resolution (${res.status})`);
+  }
+  const resBody = await res.json();
+  return resBody.item;
 }
 
 export async function getReport(id: string): Promise<AnalysisReport> {

@@ -3,9 +3,32 @@
 // Ceiling: nothing survives a restart and the queue won't scale across processes.
 // Upgrade path: Upstash Redis (Cache/Queue) + Postgres (Repository).
 
-import type { AnalysisReport, AuditRecord, CitationRow, ClaimRow, ContentItem, PerspectiveRow } from '../types';
+import type { AnalysisReport, AuditRecord, CitationRow, ClaimRow, ContentItem, PerspectiveRow, ResolutionOutcome, ReviewActionResult, ReviewItem, ReviewKind, ReviewLifecycle, ReviewResolutionInput } from '../types';
 import { projectReportGraph } from '../core/reportGraph';
 import type { Cache, Job, JobHandler, Queue, RateLimiter, Repository } from './ports';
+
+// Parse a Review_Item id "{kind}:{sourceId}" (e.g. "dispute:<uuid>") into its
+// parts. Returns null for any malformed id so callers map it to not_found.
+// ponytail: split on the FIRST colon only — kind has no colon, sourceId (uuid) has none.
+function parseReviewItemId(id: string): { kind: ReviewKind; sourceId: string } | null {
+  const sep = id.indexOf(':');
+  if (sep <= 0) return null;
+  const kind = id.slice(0, sep);
+  const sourceId = id.slice(sep + 1);
+  if ((kind !== 'dispute' && kind !== 'flag') || sourceId.length === 0) return null;
+  return { kind, sourceId };
+}
+
+// Base intake row shapes (unchanged intake contract) plus the additive review
+// fields stored alongside each Dispute/Flag — mirrors Migration_005's additive
+// columns so the existing public accessors expose review state offline (Req 6.4).
+type DisputeRow = { id: string; reportId: string; claimId?: string; reason: string; createdAt: string };
+type FlagRow = { id: string; reportId: string; userId: string; technique: string; note?: string; createdAt: string };
+type ReviewFields = {
+  reviewStatus: ReviewLifecycle;
+  assignedReviewer: string | null;
+  resolution: { outcome: ResolutionOutcome; note?: string; reviewer: string; resolvedAt: string } | null;
+};
 
 export class InMemoryCache implements Cache {
   private store = new Map<string, AnalysisReport>();
@@ -36,9 +59,10 @@ export class InMemoryRepository implements Repository {
   private contentByHash = new Map<string, ContentItem>();
   private reports = new Map<string, AnalysisReport>();
   // Public so tests can assert persistence without a database (mirrors the
-  // disputes/flags table rows). ponytail: append-only, non-durable.
-  readonly disputes: { id: string; reportId: string; claimId?: string; reason: string; createdAt: string }[] = [];
-  readonly flags: { id: string; reportId: string; userId: string; technique: string; note?: string; createdAt: string }[] = [];
+  // disputes/flags table rows, now carrying the additive review-workflow state
+  // so review status is readable offline). ponytail: append-only, non-durable.
+  readonly disputes: (DisputeRow & ReviewFields)[] = [];
+  readonly flags: (FlagRow & ReviewFields)[] = [];
   // Per-report audit log, mirroring the Postgres audit_records table keyed by report_id.
   readonly auditRecords = new Map<string, AuditRecord[]>();
   // Normalized rows from the dual-write, keyed by reportId — mirrors the
@@ -87,7 +111,8 @@ export class InMemoryRepository implements Repository {
   }
 
   async createDispute(d: { id: string; reportId: string; claimId?: string; reason: string; createdAt: string }): Promise<void> {
-    this.disputes.push(d);
+    // Req 8.4: a freshly created intake is a pending Review_Item, unassigned, unresolved.
+    this.disputes.push({ ...d, reviewStatus: 'pending', assignedReviewer: null, resolution: null });
   }
 
   async createFlag(f: { id: string; reportId: string; userId: string; technique: string; note?: string; createdAt: string }): Promise<void> {
@@ -95,7 +120,8 @@ export class InMemoryRepository implements Repository {
     const dup = this.flags.some(
       (x) => x.reportId === f.reportId && x.userId === f.userId && x.technique === f.technique,
     );
-    if (!dup) this.flags.push(f);
+    // Req 8.4: a freshly created intake is a pending Review_Item, unassigned, unresolved.
+    if (!dup) this.flags.push({ ...f, reviewStatus: 'pending', assignedReviewer: null, resolution: null });
   }
 
   // ponytail: append-only in-memory log keyed by reportId — non-durable, dev/test parity.
@@ -103,6 +129,108 @@ export class InMemoryRepository implements Repository {
     const list = this.auditRecords.get(reportId);
     if (list) list.push(record);
     else this.auditRecords.set(reportId, [record]);
+  }
+
+  // ---- Review workflow (expert-review-queue) -------------------------------
+  // Review state lives on the disputes/flags rows above; these methods are the
+  // only access path (Req 6.1). Each runs to completion with no `await` between
+  // its read and write, so on the single-threaded event loop a claim/release/
+  // resolve is atomic by construction — no interleaving (Req 3.5).
+
+  // Project a stored row to the identity-free Review_Item shape. A flag's userId
+  // is deliberately NOT projected — no submitter identity reaches a Review_Item
+  // (Req 8.2).
+  private toReviewItem(kind: ReviewKind, row: (DisputeRow & ReviewFields) | (FlagRow & ReviewFields)): ReviewItem {
+    const item: ReviewItem = {
+      id: `${kind}:${row.id}`,
+      kind,
+      reportId: row.reportId,
+      status: row.reviewStatus,
+      assignedReviewer: row.assignedReviewer,
+      createdAt: row.createdAt,
+    };
+    if (kind === 'dispute') {
+      const d = row as DisputeRow & ReviewFields;
+      item.reason = d.reason;
+      if (d.claimId !== undefined) item.claimId = d.claimId; // only when present (Req 2.3)
+    } else {
+      const f = row as FlagRow & ReviewFields;
+      item.technique = f.technique;
+      if (f.note !== undefined) item.note = f.note; // only when present (Req 2.3)
+    }
+    return item;
+  }
+
+  // Resolve a Review_Item id to its kind + the live row object (mutable in place).
+  private locate(id: string): { kind: ReviewKind; row: (DisputeRow & ReviewFields) | (FlagRow & ReviewFields) } | undefined {
+    const parsed = parseReviewItemId(id);
+    if (!parsed) return undefined;
+    const arr = parsed.kind === 'dispute' ? this.disputes : this.flags;
+    const row = arr.find((r) => r.id === parsed.sourceId);
+    return row ? { kind: parsed.kind, row } : undefined;
+  }
+
+  async listReviewItems(filter?: { status?: ReviewLifecycle }): Promise<ReviewItem[]> {
+    const items: ReviewItem[] = [
+      ...this.disputes.map((d) => this.toReviewItem('dispute', d)),
+      ...this.flags.map((f) => this.toReviewItem('flag', f)),
+    ];
+    const filtered = filter?.status ? items.filter((i) => i.status === filter.status) : items;
+    // createdAt ascending; ties broken by reportId ascending (Req 2.6).
+    filtered.sort((a, b) =>
+      a.createdAt < b.createdAt ? -1
+      : a.createdAt > b.createdAt ? 1
+      : a.reportId < b.reportId ? -1
+      : a.reportId > b.reportId ? 1
+      : 0,
+    );
+    return filtered; // [] when nothing matches (Req 2.8, 6.8)
+  }
+
+  async claimReviewItem(id: string, reviewer: string): Promise<ReviewActionResult> {
+    const found = this.locate(id);
+    if (!found) return { ok: false, reason: 'not_found' }; // Req 3.6
+    const { kind, row } = found;
+    if (row.reviewStatus === 'pending') {
+      // Atomic compare-and-set: grant (Req 3.1).
+      row.assignedReviewer = reviewer;
+      row.reviewStatus = 'in_review';
+      return { ok: true, item: this.toReviewItem(kind, row) };
+    }
+    if (row.reviewStatus === 'in_review' && row.assignedReviewer === reviewer) {
+      return { ok: true, item: this.toReviewItem(kind, row) }; // idempotent re-claim (Req 3.4)
+    }
+    // in_review held by another reviewer (Req 3.2) or resolved (Req 3.3).
+    return { ok: false, reason: 'conflict' };
+  }
+
+  async releaseReviewItem(id: string, reviewer: string): Promise<ReviewActionResult> {
+    const found = this.locate(id);
+    if (!found) return { ok: false, reason: 'not_found' };
+    const { kind, row } = found;
+    if (row.reviewStatus === 'in_review' && row.assignedReviewer === reviewer) {
+      row.assignedReviewer = null;
+      row.reviewStatus = 'pending';
+      return { ok: true, item: this.toReviewItem(kind, row) }; // Req 3.7
+    }
+    // Not held by the caller (pending, resolved, or held by another) (Req 3.8, 6.7).
+    return { ok: false, reason: 'not_actionable' };
+  }
+
+  async recordReviewResolution(id: string, resolution: ReviewResolutionInput): Promise<ReviewActionResult> {
+    const found = this.locate(id);
+    if (!found) return { ok: false, reason: 'not_found' }; // Req 4.4
+    const { kind, row } = found;
+    // No prior claim required; overwrites any existing resolution so an
+    // already-resolved row is replaced, never duplicated (Req 4.1, 4.5).
+    row.resolution = {
+      outcome: resolution.outcome,
+      ...(resolution.note !== undefined ? { note: resolution.note } : {}),
+      reviewer: resolution.reviewer,
+      resolvedAt: new Date().toISOString(),
+    };
+    row.reviewStatus = 'resolved';
+    return { ok: true, item: this.toReviewItem(kind, row) };
   }
 }
 

@@ -3,6 +3,8 @@
 
 import { z } from 'zod';
 
+import { RESOLUTION_OUTCOMES } from '../core/reviewOutcome';
+
 export const submitSchema = z
   .object({
     sourceType: z.enum(['youtube', 'article', 'transcript']),
@@ -28,3 +30,19 @@ export const flagSchema = z.object({
 });
 
 export type FlagInput = z.infer<typeof flagSchema>;
+
+// Review queue filter (Req 2.5): optional status narrows the queue listing.
+export const reviewQueueQuerySchema = z.object({
+  status: z.enum(['pending', 'in_review', 'resolved']).optional(),
+});
+
+export type ReviewQueueQuery = z.infer<typeof reviewQueueQuerySchema>;
+
+// Review resolution (Req 4.2, 4.3): outcome is bounded to the framing/evidence-only
+// Resolution_Outcome vocabulary; an optional note records reviewer rationale.
+export const reviewResolutionSchema = z.object({
+  outcome: z.enum(RESOLUTION_OUTCOMES),
+  note: z.string().max(2000).optional(),
+});
+
+export type ReviewResolutionInput = z.infer<typeof reviewResolutionSchema>;

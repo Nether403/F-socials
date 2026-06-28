@@ -99,3 +99,31 @@ export interface PolicyDescriptor {
   tiers: { tier: SourceTier; label: string; meaning: string }[];
   openSignals: { name: string; raises: SourceTier }[];
 }
+
+// --- Expert review queue (mirrors apps/server/src/types.ts + core/reviewOutcome.ts) ---
+
+export type ReviewKind = 'dispute' | 'flag';
+export type ReviewLifecycle = 'pending' | 'in_review' | 'resolved';
+
+// Framing/evidence-only outcomes — never a truthfulness verdict or creator rating.
+export type ResolutionOutcome =
+  | 'framing_example_confirmed'
+  | 'framing_example_weak'
+  | 'evidence_adequately_cited'
+  | 'evidence_overstated'
+  | 'context_gap_noted'
+  | 'no_change_needed'
+  | 'needs_further_review';
+
+export interface ReviewItem {
+  id: string; // "{kind}:{sourceId}"
+  kind: ReviewKind;
+  reportId: string;
+  status: ReviewLifecycle;
+  assignedReviewer: string | null; // null when unassigned
+  createdAt: string; // ISO 8601
+  reason?: string; // dispute-derived
+  claimId?: string; // dispute-derived, only when present
+  technique?: string; // flag-derived
+  note?: string; // flag-derived, only when present
+}

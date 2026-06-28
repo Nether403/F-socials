@@ -47,6 +47,9 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? '',
   redisUrl: process.env.REDIS_URL ?? '',
   corsOrigin: process.env.CORS_ORIGIN ?? '', // set in prod (web origin); empty = no CORS headers (dev proxy)
+  // Reviewer role gating the review routes; matched against the JWT `role` claim.
+  // Empty (unset) ⇒ fail closed: every review route is denied (Req 1.6).
+  reviewerRole: process.env.REVIEWER_ROLE ?? '',
   // provider selectors
   llmProvider: process.env.LLM_PROVIDER ?? 'mock', // mock | gemini
   evidenceProvider: process.env.EVIDENCE_PROVIDER ?? 'mock', // mock | google_factcheck | gdelt | tavily | chain

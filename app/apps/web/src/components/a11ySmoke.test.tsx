@@ -167,6 +167,9 @@ describe('axe ARIA-wiring scan (Req 4.3, 4.4, 1.9)', () => {
     render(<Report report={fullReport} onBack={() => {}} />);
 
     // Issue-frame markers are role="img" with a textual aria-label (color-never-alone).
+    // The issue-frame chart now sits behind its own disclosure drawer, collapsed on first
+    // paint (progressive-disclosure-report-ui Req 2.1), so open it before asserting markers.
+    await user.click(screen.getByRole('button', { name: /issue-frame position/i }));
     const markers = screen.getAllByRole('img');
     expect(markers.length).toBeGreaterThanOrEqual(2);
     markers.forEach((m) => expect(m).toHaveAttribute('aria-label'));

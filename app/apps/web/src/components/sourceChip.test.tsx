@@ -9,7 +9,7 @@
 // behavioural contract (correct tier -> correct label, nothing extra) across all
 // four tier values and arbitrary source names/URLs.
 import { describe, it, expect } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, screen } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
 import type { AnalysisReport, Citation, SourceTier } from '../api/types';
@@ -73,18 +73,20 @@ describe('Property 4: a source chip renders its tier label and never a creator',
 
         const { container } = render(<Report report={reportWithCitation(citation)} onBack={() => {}} />);
         try {
-          // Expand the claim drawer where citations live.
+          // Claims sit behind a collapsed disclosure drawer (progressive-disclosure-report-ui
+          // Req 2.1); open it, then expand the claim's own drawer where citations live.
+          fireEvent.click(screen.getByRole('button', { name: /Claim Ledger/i }));
           const head = container.querySelector('.claim-head');
           expect(head).not.toBeNull();
           fireEvent.click(head as Element);
 
           const expectedLabel = EXPECTED_TIER_LABEL[tier];
 
-          // The chip's tier-label row renders, and reads exactly source name + the
-          // mapped tier label — no appended creator/verdict text.
+          // The source name renders on the citation's name row; the tier label now renders as
+          // its own Source_Tier_Chip (single source of truth) rather than appended inline text.
           const nameEl = container.querySelector('.citation .name');
           expect(nameEl).not.toBeNull();
-          expect(nameEl?.textContent).toBe(`${sourceName} · ${expectedLabel}`);
+          expect(nameEl?.textContent).toBe(sourceName);
 
           // None of the other three tier labels appear anywhere in the rendered
           // report — the mapping is exact and never a different/creator label.

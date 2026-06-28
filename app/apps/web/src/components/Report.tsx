@@ -25,6 +25,13 @@ import type {
 import { submitFlag } from '../api/client';
 import { track } from '../analytics';
 import { DisputeModal } from './DisputeModal';
+import { SummaryLead } from './SummaryLead';
+import { DisclosureSection } from './DisclosureSection';
+import { RationaleBlock } from './RationaleBlock';
+import { CoverageAngleNote } from './CoverageAngleNote';
+import { IssueFrameChip } from './IssueFrameChip';
+import { SourceTierChip } from './SourceTierChip';
+import { claimRationale, sectionCounts } from './reportView';
 
 // Neutral, non-verdict mapping: evidenceStrength = how much external review exists.
 const STRENGTH: Record<EvidenceStrength, { label: string; cls: string; Icon: typeof ShieldCheck }> = {
@@ -41,7 +48,7 @@ const VERIFIABILITY: Record<Verifiability, string> = {
   unverifiable: 'Unverifiable',
 };
 
-const TIER: Record<SourceTier, string> = {
+export const TIER: Record<SourceTier, string> = {
   tier1_primary: 'Tier 1 · Primary',
   tier2_institutional: 'Tier 2 · Institutional',
   tier3_viewpoint: 'Tier 3 · Viewpoint',
@@ -79,7 +86,7 @@ export function divergenceLabel(d: number): string {
 
 const SEVERITY_RANK: Record<FramingSignal['severity'], number> = { high: 3, medium: 2, low: 1 };
 
-function severityTagCls(sev: FramingSignal['severity']): string {
+export function severityTagCls(sev: FramingSignal['severity']): string {
   return sev === 'high' ? 'amber' : sev === 'medium' ? 'info' : 'muted';
 }
 
@@ -90,8 +97,6 @@ export function topFramingSignal(signals: FramingSignal[]): FramingSignal | unde
     undefined,
   );
 }
-
-type Tab = 'claims' | 'framing' | 'context' | 'perspectives';
 
 export function Report({
   report,
@@ -106,7 +111,6 @@ export function Report({
   // is absent today and the auth-gated Flag/Save controls always show the prompt (3.11).
   currentUser?: { id: string } | null;
 }) {
-  const [tab, setTab] = useState<Tab>('claims');
   // Dispute_Modal mount seam (Req 3.10). Task 11.2 swaps the placeholder below
   // for the real <Dispute_Modal reportId={report.id} .../> driven by this state.
   const [disputeOpen, setDisputeOpen] = useState(false);
@@ -143,6 +147,10 @@ export function Report({
     });
   }
 
+  // Per-section item counts surfaced on each drawer control; each equals its collection length
+  // (single source of truth, Req 8.2). Read-only — nothing is written back to the report.
+  const counts = sectionCounts(report);
+
   return (
     <div>
       <div className="report-head">
@@ -152,7 +160,7 @@ export function Report({
           </button>
           <h2 className="editorial">{report.title ?? 'Analysis report'}</h2>
           <div className="meta-row">
-            {report.issueFrame && <span>Frame: {report.issueFrame.label}</span>}
+            {report.issueFrame?.label && <IssueFrameChip label={report.issueFrame.label} />}
             <span>{report.claims.length} claims</span>
             <span>{report.framingSignals.length} framing signals</span>
           </div>
@@ -191,40 +199,36 @@ export function Report({
         </div>
       )}
 
-      {report.tldr && (
-        <div className="card">
-          <div className="section-label">Summary</div>
-          <p className="tldr">{report.tldr}</p>
-        </div>
+      {/* Summary_Lead leads the page, expanded before any interaction (Req 1.x). Every other
+          section sits behind an independent disclosure drawer, collapsed on first paint (Req 2.1). */}
+      <SummaryLead report={report} />
+
+      <DisclosureSection title="Claim Ledger" count={counts.claims}>
+        <Claims claims={report.claims} />
+      </DisclosureSection>
+
+      <DisclosureSection title="Framing Signals" count={counts.framingSignals}>
+        <Framing report={report} onFlag={onFlag} />
+      </DisclosureSection>
+
+      <DisclosureSection title="Useful Context" count={counts.contextCards}>
+        <Context cards={report.contextCards} />
+      </DisclosureSection>
+
+      <DisclosureSection title="Other Angles" count={counts.perspectives}>
+        {/* Descriptive "covered from one angle" note (Req 4.x); reads report.issueFrame and
+            whether any bridging perspectives exist. Renders nothing on honest absence. */}
+        <CoverageAngleNote issueFrame={report.issueFrame} hasPerspectives={report.perspectives.length > 0} />
+        <Perspectives links={report.perspectives} />
+      </DisclosureSection>
+
+      {/* The issue-frame chart's text-determinable axis positions live behind their own drawer
+          (Req 2.1, 5.5); omitted entirely when the report carries no issue frame. */}
+      {report.issueFrame && (
+        <DisclosureSection title="Issue-Frame Position">
+          <IssueFrame x={report.issueFrame.x} y={report.issueFrame.y} />
+        </DisclosureSection>
       )}
-
-      {report.issueFrame && <IssueFrame x={report.issueFrame.x} y={report.issueFrame.y} />}
-
-      {(() => {
-        const top = topFramingSignal(report.framingSignals);
-        return top ? (
-          <div className="card top-signal">
-            <div className="section-label">Most important framing signal</div>
-            <div className="row">
-              <h4>{top.technique}</h4>
-              <span className={`tag ${severityTagCls(top.severity)}`}>{top.severity} severity</span>
-            </div>
-            <p>{top.description}</p>
-          </div>
-        ) : null;
-      })()}
-
-      <div className="tabs">
-        <Tabbtn id="claims" tab={tab} setTab={setTab} label="Claim Ledger" n={report.claims.length} />
-        <Tabbtn id="framing" tab={tab} setTab={setTab} label="Framing Signals" n={report.framingSignals.length} />
-        <Tabbtn id="context" tab={tab} setTab={setTab} label="Useful Context" n={report.contextCards.length} />
-        <Tabbtn id="perspectives" tab={tab} setTab={setTab} label="Other Angles" n={report.perspectives.length} />
-      </div>
-
-      {tab === 'claims' && <Claims claims={report.claims} />}
-      {tab === 'framing' && <Framing report={report} onFlag={onFlag} />}
-      {tab === 'context' && <Context cards={report.contextCards} />}
-      {tab === 'perspectives' && <Perspectives links={report.perspectives} />}
 
       {report.provenance && (
         <div className="provenance">
@@ -260,18 +264,6 @@ export function Report({
         />
       )}
     </div>
-  );
-}
-
-function Tabbtn(props: { id: Tab; tab: Tab; setTab: (t: Tab) => void; label: string; n: number }) {
-  return (
-    <button
-      className={`tab ${props.tab === props.id ? 'active' : ''}`}
-      aria-pressed={props.tab === props.id}
-      onClick={() => props.setTab(props.id)}
-    >
-      {props.label} <span className="count">({props.n})</span>
-    </button>
   );
 }
 
@@ -381,12 +373,9 @@ function ClaimCard({ claim, num }: { claim: Claim; num: number }) {
               <div className="quote">“{claim.transcriptSpan}”</div>
             </div>
           )}
-          {(claim.evidenceDescription || claim.sourceBasis) && (
-            <div>
-              <div className="sub">Evidence review</div>
-              <div>{claim.evidenceDescription ?? claim.sourceBasis}</div>
-            </div>
-          )}
+          {/* "Why this is here": evidence description, else source basis, else nothing — verbatim,
+              no verdict (Req 3.2, 3.3, 3.4, 3.5). Single source of truth via claimRationale. */}
+          <RationaleBlock label="Why this is here" text={claimRationale(claim)} />
           <div>
             <div className="sub">
               Sources {claim.citations.length === 0 && '— none found (treat with caution)'}
@@ -396,9 +385,11 @@ function ClaimCard({ claim, num }: { claim: Claim; num: number }) {
                 <div>
                   <div>{cit.excerpt ?? cit.sourceName}</div>
                   <div className="name">
-                    {cit.sourceName} · {TIER[cit.sourceTier]}
+                    {cit.sourceName}
                     {cit.supports === false ? ' · contradicts' : cit.supports === true ? ' · supports' : ''}
                   </div>
+                  {/* Source-tier chip: human-readable label, sources only, never the creator (Req 6.1, 6.3). */}
+                  <SourceTierChip tier={cit.sourceTier} />
                 </div>
                 <ExternalLink size={15} />
               </a>
@@ -514,11 +505,13 @@ function Perspectives({ links }: { links: AnalysisReport['perspectives'] }) {
       {links.map((p, i) => (
         <div key={i} className="mini-card">
           <div className="badge-row" style={{ marginBottom: 6 }}>
-            <span className="tag info">{p.issueFrameLabel}</span>
-            <span className="tag muted">{TIER[p.sourceTier]}</span>
+            {/* Descriptive spatial chip + source-tier chip — single source of truth, never a verdict
+                and never creator-scoped (Req 5.3, 6.2). Each omits on honest absence. */}
+            <IssueFrameChip label={p.issueFrameLabel} />
+            <SourceTierChip tier={p.sourceTier} />
           </div>
           <h4>{p.sourceName}</h4>
-          {p.whyIncluded && <p>{p.whyIncluded}</p>}
+          <RationaleBlock label="Why included" text={p.whyIncluded} />
           <div className="diverge" role="img" aria-label={divergenceLabel(p.divergence)}>
             <i style={{ width: `${Math.round(Math.max(0, Math.min(1, p.divergence)) * 100)}%` }} />
           </div>

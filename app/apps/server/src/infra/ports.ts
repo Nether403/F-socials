@@ -1,7 +1,16 @@
 // Infrastructure interfaces. In-memory implementations now; swap for
 // Upstash Redis (Cache/Queue) and Postgres (Repository) later — no core changes.
 
-import type { AnalysisReport, AuditRecord, ContentItem, RawInput } from '../types';
+import type {
+  AnalysisReport,
+  AuditRecord,
+  ContentItem,
+  RawInput,
+  ReviewActionResult,
+  ReviewItem,
+  ReviewLifecycle,
+  ReviewResolutionInput,
+} from '../types';
 
 export interface Cache {
   get(key: string): Promise<AnalysisReport | undefined>;
@@ -42,6 +51,14 @@ export interface Repository {
   // report_id is linked at the insert (the AuditRecord blob itself carries only
   // claimId), mirroring createDispute/createFlag which take reportId explicitly.
   saveAuditRecord(reportId: string, record: AuditRecord): Promise<void>;
+  // Review workflow (expert-review-queue). Review state lives as additive columns
+  // on disputes/flags, reached only through these methods (Req 6.1). Mutations use
+  // a discriminated ReviewActionResult instead of exceptions for expected control
+  // flow, so routes map outcomes to HTTP codes (Req 8.1, 8.3).
+  listReviewItems(filter?: { status?: ReviewLifecycle }): Promise<ReviewItem[]>;
+  claimReviewItem(id: string, reviewer: string): Promise<ReviewActionResult>;
+  releaseReviewItem(id: string, reviewer: string): Promise<ReviewActionResult>;
+  recordReviewResolution(id: string, resolution: ReviewResolutionInput): Promise<ReviewActionResult>;
 }
 
 export interface RateLimitResult {

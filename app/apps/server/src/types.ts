@@ -235,3 +235,52 @@ export interface AuditRecord {
   prototypeVocab: PrototypeVocab;
   createdAt: string; // ISO
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Expert review queue types. Union types (not TS enums) to match the rest of
+// this file and map 1:1 to the Postgres enums in db/migrations/005_review_workflow.sql.
+// Lens, not judge: no value here carries a creator-reliability rating or a
+// truthfulness verdict — the outcome vocabulary describes framing/evidence only.
+
+export type ReviewKind = 'dispute' | 'flag';
+export type ReviewLifecycle = 'pending' | 'in_review' | 'resolved';
+
+// ponytail: the single source of truth for these seven framing/evidence-only
+// values is core/reviewOutcome.ts (RESOLUTION_OUTCOMES). It is created in parallel
+// (task 1.2); declared standalone here to avoid a hard dependency on a not-yet-
+// existing file. When reviewOutcome.ts lands, prefer re-exporting its derived type.
+export type ResolutionOutcome =
+  | 'framing_example_confirmed'
+  | 'framing_example_weak'
+  | 'evidence_adequately_cited'
+  | 'evidence_overstated'
+  | 'context_gap_noted'
+  | 'no_change_needed'
+  | 'needs_further_review';
+
+export interface ReviewItem {
+  id: string; // "{kind}:{sourceId}"
+  kind: ReviewKind;
+  reportId: string;
+  status: ReviewLifecycle;
+  assignedReviewer: string | null; // null when unassigned
+  createdAt: string; // ISO 8601
+  // dispute-derived
+  reason?: string;
+  claimId?: string; // only when the dispute carries one
+  // flag-derived
+  technique?: string;
+  note?: string; // only when the flag carries one
+}
+
+export interface ReviewResolutionInput {
+  outcome: ResolutionOutcome;
+  note?: string; // <= 2000 chars (validated at the route)
+  reviewer: string; // resolving reviewer id
+}
+
+// Discriminated result so callers map outcomes to HTTP codes without exceptions
+// for expected control flow (mirrors the repo's existing fail-soft style).
+export type ReviewActionResult =
+  | { ok: true; item: ReviewItem }
+  | { ok: false; reason: 'not_found' | 'conflict' | 'not_actionable' };

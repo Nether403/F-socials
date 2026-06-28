@@ -97,14 +97,18 @@ describe('Property 11: color-coded signals always carry equivalent text', () => 
         const report = makeReport(evidenceStrength, severity, sourceTier);
         render(<Report report={report} onBack={() => {}} />);
         try {
-          // 1. Evidence strength — label text appears on the claim card (Claim Ledger tab is default).
+          // Claims now sit behind a collapsed disclosure drawer (progressive-disclosure-report-ui
+          // Req 2.1); open it so the claim card and its evidence-strength tag render.
+          fireEvent.click(screen.getByRole('button', { name: /Claim Ledger/i }));
+
+          // 1. Evidence strength — label text appears on the claim card.
           expect(hasText(STRENGTH_LABEL[evidenceStrength])).toBe(true);
 
           // 2. Source tier — open the claim drawer, then the citation's tier label text appears.
           fireEvent.click(screen.getByText('CLAIM_UNDER_TEST'));
           expect(hasText(TIER_LABEL[sourceTier])).toBe(true);
 
-          // 3. Framing severity — switch to the Framing tab; severity is rendered as "<severity> severity".
+          // 3. Framing severity — open the Framing Signals drawer; severity renders as "<severity> severity".
           fireEvent.click(screen.getByRole('button', { name: /Framing Signals/i }));
           expect(hasText(`${severity} severity`)).toBe(true);
         } finally {

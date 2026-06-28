@@ -5,12 +5,14 @@ import { track } from './analytics';
 import type { AnalysisReport } from './api/types';
 import { Report } from './components/Report';
 import { Methodology } from './components/Methodology';
+import { ReviewerConsole } from './components/ReviewerConsole';
 
 type View =
   | { kind: 'home' }
   | { kind: 'loading'; status: string }
   | { kind: 'report'; report: AnalysisReport; shared?: boolean }
   | { kind: 'methodology' }
+  | { kind: 'review' }
   | { kind: 'error'; message: string };
 
 // Render-time guard for the Methodology page (Requirement 1.12). If the page
@@ -100,6 +102,11 @@ export default function App() {
       if (/^#\/methodology\b/.test(hash)) {
         if (viewRef.current.kind === 'report') priorReportRef.current = viewRef.current;
         setView({ kind: 'methodology' });
+        return;
+      }
+      // #/review serves the reviewer console (Req 11.1). Hash routing only.
+      if (/^#\/review\b/.test(hash)) {
+        setView({ kind: 'review' });
         return;
       }
     }
@@ -232,6 +239,8 @@ export default function App() {
             <Methodology onBack={leaveMethodology} />
           </MethodologyBoundary>
         )}
+
+        {view.kind === 'review' && <ReviewerConsole onBack={goHome} />}
       </div>
     </div>
   );

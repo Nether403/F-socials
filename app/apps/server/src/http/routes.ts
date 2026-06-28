@@ -6,8 +6,9 @@ import type { Cache, Queue, RateLimiter, Repository, Telemetry } from '../infra/
 import type { AnalysisReport, ContentItem, RawInput } from '../types';
 import { cacheKey } from '../core/hash';
 import { policyDescriptor } from '../core/sourceTier';
-import { submitSchema, disputeSchema, flagSchema } from './validation';
-import { requireAuth } from './auth';
+import { deriveReportReviewStatus } from '../core/reportReviewStatus';
+import { submitSchema, disputeSchema, flagSchema, reviewQueueQuerySchema, reviewResolutionSchema } from './validation';
+import { requireAuth, reviewerGuard } from './auth';
 
 export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter; telemetry: Telemetry }): Router {
   const router = Router();
@@ -15,6 +16,31 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
   const paramId = (req: Request): string | undefined => {
     const v = req.params.id;
     return Array.isArray(v) ? v[0] : v;
+  };
+
+  // Review_Item id is "{kind}:{sourceId}". Split on the first ':' only (a sourceId
+  // could itself contain ':'); require a known kind and a non-empty sourceId.
+  const parseReviewItemId = (raw: string | undefined): { kind: 'dispute' | 'flag'; sourceId: string } | null => {
+    if (!raw) return null;
+    const sep = raw.indexOf(':');
+    if (sep <= 0) return null;
+    const kind = raw.slice(0, sep);
+    const sourceId = raw.slice(sep + 1);
+    if ((kind !== 'dispute' && kind !== 'flag') || !sourceId) return null;
+    return { kind, sourceId };
+  };
+
+  // Overlay the report's DERIVED review status onto the OUTGOING response object
+  // only (Req 5.1, 5.2). The persisted report is never rewritten and no
+  // gate-relevant field is read or touched, so the invariant gate is preserved by
+  // construction (Req 5.4, 10.1, 10.3). When provenance is absent there is no
+  // reviewStatus to overlay onto, so the report is returned unchanged (Req 5.5).
+  const overlayReviewStatus = async (report: AnalysisReport): Promise<AnalysisReport> => {
+    if (!report.provenance) return report;
+    const items = await deps.repo.listReviewItems();
+    const itemStatuses = items.filter((it) => it.reportId === report.id).map((it) => it.status);
+    const derived = deriveReportReviewStatus(report.provenance.reviewStatus, itemStatuses);
+    return { ...report, provenance: { ...report.provenance, reviewStatus: derived } };
   };
 
   // Who am I — protected; proves auth works.
@@ -97,7 +123,7 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     if (!id) return res.status(400).json({ error: 'missing_id' });
     const report = await deps.repo.getReport(id);
     if (!report) return res.status(404).json({ error: 'not_found' });
-    return res.json(report);
+    return res.json(await overlayReviewStatus(report));
   });
 
   // GET /api/v1/analyses/:id/status — lightweight poll for the loading screen.
@@ -163,6 +189,61 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     return res.status(201).json({ ok: true });
   });
 
+  // --- Review workflow (expert-review-queue) -------------------------------
+  // Every review route is behind requireAuth + reviewerGuard (Req 1.5): a
+  // missing/invalid token → 401 (requireAuth), an authenticated non-reviewer
+  // or unconfigured REVIEWER_ROLE → 403 (reviewerGuard).
+
+  // GET /api/v1/review/queue — list Review_Items, optional ?status= filter.
+  router.get('/review/queue', requireAuth, reviewerGuard, async (req: Request, res: Response) => {
+    const parsed = reviewQueueQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      // Req 2.5 — invalid filter value: 400, no items.
+      return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    const items = await deps.repo.listReviewItems({ status: parsed.data.status });
+    return res.status(200).json(items); // Req 2.7 — [] when empty, still 200.
+  });
+
+  // POST /api/v1/review/items/:id/claim — claim a pending Review_Item.
+  router.post('/review/items/:id/claim', requireAuth, reviewerGuard, async (req: Request, res: Response) => {
+    const id = paramId(req);
+    if (!parseReviewItemId(id)) return res.status(400).json({ error: 'invalid_review_item_id' });
+    const result = await deps.repo.claimReviewItem(id!, req.user!.id);
+    if (result.ok) return res.status(200).json({ item: result.item }); // Req 3.1, 3.4
+    if (result.reason === 'not_found') return res.status(404).json({ error: 'review_item_not_found' }); // Req 3.6
+    return res.status(409).json({ error: 'review_item_conflict' }); // Req 3.2, 3.3
+  });
+
+  // POST /api/v1/review/items/:id/release — release an item the caller holds.
+  router.post('/review/items/:id/release', requireAuth, reviewerGuard, async (req: Request, res: Response) => {
+    const id = paramId(req);
+    if (!parseReviewItemId(id)) return res.status(400).json({ error: 'invalid_review_item_id' });
+    const result = await deps.repo.releaseReviewItem(id!, req.user!.id);
+    if (result.ok) return res.status(200).json({ item: result.item }); // Req 3.7
+    if (result.reason === 'not_found') return res.status(404).json({ error: 'review_item_not_found' });
+    if (result.reason === 'not_actionable') return res.status(409).json({ error: 'review_item_not_actionable' }); // Req 3.8
+    return res.status(409).json({ error: 'review_item_conflict' });
+  });
+
+  // POST /api/v1/review/items/:id/resolution — record a Review_Resolution.
+  router.post('/review/items/:id/resolution', requireAuth, reviewerGuard, async (req: Request, res: Response) => {
+    const id = paramId(req);
+    if (!parseReviewItemId(id)) return res.status(400).json({ error: 'invalid_review_item_id' });
+    const parsed = reviewResolutionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      // Req 4.3 — out-of-set outcome or note > 2000: 400, nothing persisted.
+      return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    const result = await deps.repo.recordReviewResolution(id!, {
+      outcome: parsed.data.outcome,
+      note: parsed.data.note,
+      reviewer: req.user!.id,
+    });
+    if (result.ok) return res.status(200).json({ item: result.item }); // Req 4.1, 4.5
+    return res.status(404).json({ error: 'review_item_not_found' }); // Req 4.4
+  });
+
   // GET /api/v1/policy — PUBLIC source-tier policy descriptor (no auth). Powers
   // the methodology page so the tiering rules are inspectable (1.6, 2.5).
   router.get('/policy', (_req: Request, res: Response) => {
@@ -175,7 +256,7 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     if (!slug) return res.status(400).json({ error: 'missing_slug' });
     const report = await deps.repo.getReportBySlug(slug);
     if (!report) return res.status(404).json({ error: 'not_found' });
-    return res.json(report);
+    return res.json(await overlayReviewStatus(report));
   });
 
   return router;

@@ -77,6 +77,9 @@ if (mode === 'deployed') {
   if (!limiter) {
     console.warn('[startup] Rate_Limiter did not activate — new analyses are not rate limited');
   }
+  if (!config.reviewerRole) {
+    console.warn('[auth] REVIEWER_ROLE absent — all review routes denied (fail closed)');
+  }
 }
 
 app.listen(config.port, () => {
