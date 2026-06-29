@@ -127,3 +127,53 @@ export interface ReviewItem {
   technique?: string; // flag-derived
   note?: string; // flag-derived, only when present
 }
+
+// --- Saved reports / history (mirrors apps/server/src/infra/ports.ts) ---
+
+// Lens-safe projection of a reader's saved report: the report identifier plus
+// when it was saved. Carries NO content-truthfulness verdict and NO
+// creator-reliability rating — source tiers attach only to sources/citations,
+// never to a creator (Req 12.4, 12.5).
+export interface SavedReportEntry {
+  reportId: string;
+  savedAt: string; // ISO 8601
+}
+
+// --- Institutional workspace (mirrors apps/server/src/infra/ports.ts) ---
+
+// Lens-safe projections. None of these carry a content-truthfulness verdict or a
+// creator-reliability rating; a Report is referenced by identifier only, and an
+// Annotation is a reader-authored note attributed to its author — never a verdict
+// or a creator rating (Req 10.4, 10.5).
+export type WorkspaceRole = 'owner' | 'member';
+
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  role: WorkspaceRole; // the requesting reader's role in this workspace
+}
+
+export interface Membership {
+  readerId: string; // Supabase JWT subject (TEXT)
+  role: WorkspaceRole;
+}
+
+export interface SharedCollection {
+  id: string;
+  name: string;
+}
+
+export interface CollectionItemEntry {
+  reportId: string;
+  addedAt: string; // ISO 8601
+}
+
+export interface Annotation {
+  id: string;
+  workspaceId: string;
+  reportId: string;
+  authorId: string; // Supabase JWT subject (TEXT)
+  text: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}

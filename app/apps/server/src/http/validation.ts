@@ -46,3 +46,31 @@ export const reviewResolutionSchema = z.object({
 });
 
 export type ReviewResolutionInput = z.infer<typeof reviewResolutionSchema>;
+
+// Save/remove path parameter (Req 10.4): the report :id must be a UUID. Malformed
+// ids are rejected with 400 before any persistence side effect. History takes no input.
+// Reused for the institutional-workspace :cid/:aid/:reportId UUID path params.
+export const reportIdParam = z.string().uuid();
+
+// Institutional workspace bodies (Req 8.4, 1.4, 5.4, 7.6). Names are trimmed and
+// bounded so empty/whitespace-only or oversized labels are rejected at the boundary.
+export const workspaceNameSchema = z.object({ name: z.string().trim().min(1).max(100) });
+
+export type WorkspaceNameInput = z.infer<typeof workspaceNameSchema>;
+
+export const collectionNameSchema = z.object({ name: z.string().trim().min(1).max(100) });
+
+export type CollectionNameInput = z.infer<typeof collectionNameSchema>;
+
+// A collection item references a report by UUID (Req 5.4).
+export const collectionItemSchema = z.object({ reportId: z.string().uuid() });
+
+export type CollectionItemInput = z.infer<typeof collectionItemSchema>;
+
+// Annotation text is bounded to a non-empty, reasonably sized note (Req 7.6).
+export const annotationTextSchema = z.object({ text: z.string().min(1).max(4000) });
+
+export type AnnotationTextInput = z.infer<typeof annotationTextSchema>;
+
+// Invite code path/body parameter (Req 1.4): non-empty, bounded opaque token.
+export const inviteCodeParam = z.string().min(1).max(200);

@@ -107,23 +107,26 @@ app/
         validation.ts       zod input validation at the trust boundary (submit · dispute · flag · review)
         auth.ts             optionalAuth / requireAuth / reviewerGuard middleware
         cors.ts             allowOrigin predicate + origin-checked CORS middleware
-        routes.ts           analyses · /status · /r/:slug · /policy · /disputes · /flags · /review/*
+        routes.ts           analyses · /status · /r/:slug · /policy · /disputes · /flags · /review/* · /analyses/:id/save · /saved-reports
       scripts/backfill.ts   one-shot report-graph backfill for pre-normalization reports
       compose.ts            shared composition root (buildContext): infra + providers + telemetry + meta
       index.ts              API entrypoint (HTTP only in the deployed config)
       worker.ts             worker entrypoint (queue.process only)
     test/                   invariant · evidence · gate.* · auth · cors · config · router/** ·
-                            reportGraph.* · review.* · telemetry.* · kpi.* · build smoke · degraded controls
-  apps/web/                 React 19 + Vite app (submit · loading · report · share · methodology · dispute · review)
+                            reportGraph.* · review.* · savedReports.* · telemetry.* · kpi.* · build smoke · degraded controls
+  apps/web/                 React 19 + Vite app (submit · loading · report · share · methodology · dispute · review · sign-in · history)
     src/
-      api/                  client + types (getPolicy · submitDispute · submitFlag · review fns)
+      api/                  client + types (getPolicy · submitDispute · submitFlag · review fns · authedFetch · save/unsave/listSaved)
+      auth/                 authClient (Supabase seam) · useSession hook
       components/
-        Report.tsx          report UI (claims, framing, context, perspectives, provenance footer)
+        Report.tsx          report UI (claims, framing, context, perspectives, provenance footer; session-gated Flag/Save)
         Methodology.tsx     plain-language transparency page (#/methodology, no auth)
         DisputeModal.tsx    focus-trapped dispute form
         ReviewerConsole.tsx role-gated review queue UI (#/review)
+        AuthPanel.tsx       sign-up / sign-in surface (#/sign-in)
+        HistoryView.tsx     saved-report history (#/history)
       App.tsx main.tsx styles.css
-  db/migrations/            001_init · 002_dispute_claim_id · 003_audit_records · 004_report_graph · 005_review_workflow
+  db/migrations/            001_init · 002_dispute_claim_id · 003_audit_records · 004_report_graph · 005_review_workflow · 006_saved_reports
   scripts/                  migrate.mjs · probe.mjs (manual e2e checker)
 ```
 
@@ -133,8 +136,8 @@ A report reaches `ready` only if: no claim asserts an evidence strength it can't
 
 ## What's next
 
-The trust bundle, the precision evidence router, the normalized report graph, bounded-parallel evidence lookups, observability, and the expert review workflow are all shipped. Next: accounts/save/history, persisting Supabase users into the `users` table, the client-side auth UI, EN/NL localization, and the institutional workspace. Full sequence and rationale in `../f-Socials-roadmap.md`.
+The trust bundle, the precision evidence router, the normalized report graph, bounded-parallel evidence lookups, observability, the expert review workflow, and accounts/save/history are all shipped. Next: persisting Supabase users into the `users` table, EN/NL localization, and the institutional workspace. Full sequence and rationale in `../f-Socials-roadmap.md`.
 
-> Two known limits, both intentional for this slice: full **WCAG 2.2 AA** conformance still needs manual browser + assistive-technology review (the automated checks cover ARIA wiring and the CSS-variable contrast audit, not real pixel contrast); and the web app has **no client-side auth flow yet**, so the Flag/Save controls and the Reviewer Console always show the sign-in prompt while the server still enforces `requireAuth` + `reviewerGuard`.
+> Two known limits, both intentional for this slice: full **WCAG 2.2 AA** conformance still needs manual browser + assistive-technology review (the automated checks cover ARIA wiring and the CSS-variable contrast audit, not real pixel contrast); and Supabase users are not yet synced into the local `users` table — saved reports deliberately key on the Supabase JWT subject (`TEXT`), but disputes/flags/seats still want a synced user record. The web client-side auth flow (sign up / in / out + session) and save/history are now wired against the `requireAuth` server, degrading gracefully when no Supabase config is present.
 
 > ⚠️ Real providers mean the analysis endpoint triggers paid LLM/transcription/search calls. Auth, rate limiting, role-gated review, and origin-checked CORS are wired and tested — confirm `requireAuth`, rate limits, `REVIEWER_ROLE`, and `CORS_ORIGIN` are set on the deployed config before any public exposure.

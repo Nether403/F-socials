@@ -50,7 +50,9 @@ This gate is the codified moat. **If a feature seems to require weakening it, th
 ## Current known limits (intentional)
 
 - Full **WCAG 2.2 AA** conformance still needs manual browser/AT review; automated checks cover ARIA wiring + the CSS-variable contrast audit, not real pixel contrast.
-- The web app has **no client-side auth flow yet**, so Flag/Save controls always show the sign-in prompt while the server still enforces `requireAuth`.
+- The web app **now has a client-side auth flow** (sign up / in / out + session, `@supabase/supabase-js` behind an `AuthClient` seam) wired to the real `requireAuth` server, plus save/history (`#/history`) and **institutional workspaces** (`#/workspaces`, `#/workspaces/:id` — shared collections + classroom annotation, membership-scoped); with no Supabase config it degrades gracefully (unavailable message, no form, rest of the app keeps working). See "Accounts save & history" and "Institutional workspace" in the debt ledger.
+- Saved reports **and institutional workspaces** key on the **Supabase JWT subject (`TEXT`)**, not the legacy `users(id)` UUID — Supabase users are still not synced into the local `users` table (the `reader_saved_reports` table and the `007` workspace tables deliberately follow the migration-005 subject convention).
+- Workspace persistence is additive migration `007_workspaces.sql` (`workspaces`/`workspace_members`/`workspace_invites`/`shared_collections`/`collection_items`/`annotations`), reached only through new `Repository` methods; a single `loadMembership` route guard (404-before-403, owner-only + author-or-owner predicates) is the authorization seam. Invariant gate untouched; no workspace surface or response carries a verdict or creator rating.
 
 ## Sources of truth
 

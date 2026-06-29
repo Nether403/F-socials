@@ -2,6 +2,8 @@
 // analysis_reports.data — lossless round-trip, minimal SQL. Keyed columns
 // (status, share_slug, content_id) stay populated for indexing/future queries.
 
+import { randomUUID } from 'node:crypto';
+
 import { Pool } from 'pg';
 import type {
   AnalysisReport,
@@ -14,7 +16,16 @@ import type {
   ReviewResolutionInput,
 } from '../types';
 import { projectReportGraph } from '../core/reportGraph';
-import type { Repository } from './ports';
+import type {
+  Annotation,
+  CollectionItemEntry,
+  Membership,
+  Repository,
+  SavedReportEntry,
+  SharedCollection,
+  WorkspaceRole,
+  WorkspaceSummary,
+} from './ports';
 
 export function makePgPool(connectionString: string): Pool {
   return new Pool({ connectionString, max: 5 });
@@ -356,5 +367,307 @@ export class PostgresRepository implements Repository {
     );
     if (r.rowCount === 1) return { ok: true, item: this.rowToReviewItem(r.rows[0]) };
     return { ok: false, reason: 'not_found' };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Saved reports (accounts-save-history). Parameterized SQL only; all three are
+  // scoped to reader_id (the verified JWT subject). A backing-store failure
+  // propagates as a rejected promise → route maps to 5xx, no partial mutation
+  // (Req 11.5, 11.9, 9.2, 9.6).
+
+  // Idempotent upsert: ON CONFLICT keeps the original saved_at (Req 7.3, 11.6).
+  async saveSavedReport(readerId: string, reportId: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO reader_saved_reports (reader_id, report_id) VALUES ($1, $2)
+       ON CONFLICT (reader_id, report_id) DO NOTHING`,
+      [readerId, reportId],
+    );
+  }
+
+  // Idempotent delete scoped to the reader; absent row ⇒ no-op (Req 8.3, 10.7, 11.10).
+  async removeSavedReport(readerId: string, reportId: string): Promise<void> {
+    await this.pool.query(
+      `DELETE FROM reader_saved_reports WHERE reader_id=$1 AND report_id=$2`,
+      [readerId, reportId],
+    );
+  }
+
+  // Reader-scoped, reverse-chronological with deterministic tie-break (Req 9.2, 9.6).
+  async listSavedReports(readerId: string): Promise<SavedReportEntry[]> {
+    const r = await this.pool.query(
+      `SELECT report_id, saved_at FROM reader_saved_reports
+       WHERE reader_id=$1 ORDER BY saved_at DESC, report_id DESC`,
+      [readerId],
+    );
+    return r.rows.map((row) => ({
+      reportId: row.report_id,
+      savedAt: new Date(row.saved_at).toISOString(),
+    }));
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Institutional workspace (institutional-workspace). The only persistence path
+  // for Workspace data (Req 9.1); parameterized SQL only, every caller value bound
+  // (Req 9.6). Results mirror InMemoryRepository (Req 9.2). A backing-store failure
+  // propagates as a rejected promise → route maps to 5xx, existing data unchanged,
+  // no partial mutation (Req 9.9).
+
+  // Row → Annotation. Timestamps normalized to ISO 8601, mirroring the in-memory shape.
+  private rowToAnnotation(row: {
+    id: string;
+    workspace_id: string;
+    report_id: string;
+    author_id: string;
+    text: string;
+    created_at: string | Date;
+    updated_at: string | Date;
+  }): Annotation {
+    return {
+      id: row.id,
+      workspaceId: row.workspace_id,
+      reportId: row.report_id,
+      authorId: row.author_id,
+      text: row.text,
+      createdAt: new Date(row.created_at).toISOString(),
+      updatedAt: new Date(row.updated_at).toISOString(),
+    };
+  }
+
+  // --- Workspaces & membership ---
+
+  async createWorkspace(ownerId: string, name: string): Promise<WorkspaceSummary> {
+    // Two writes in one transaction so a workspace never exists without its owner
+    // Membership (Req 1.1). The id is generated in app code (mirrors in-memory).
+    const id = randomUUID();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO workspaces (id, name, owner_id) VALUES ($1, $2, $3)`, [id, name, ownerId]);
+      await client.query(
+        `INSERT INTO workspace_members (workspace_id, reader_id, role) VALUES ($1, $2, 'owner')`,
+        [id, ownerId],
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+    return { id, name, role: 'owner' };
+  }
+
+  async listWorkspacesForReader(readerId: string): Promise<WorkspaceSummary[]> {
+    // Reader-scoped (Req 4.1, 4.2, 9.8); deterministic order by name then id (Req 4.3).
+    const r = await this.pool.query(
+      `SELECT w.id, w.name, m.role
+         FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
+        WHERE m.reader_id = $1
+        ORDER BY w.name ASC, w.id ASC`,
+      [readerId],
+    );
+    return r.rows.map((row) => ({ id: row.id, name: row.name, role: row.role as WorkspaceRole }));
+  }
+
+  async getMembership(workspaceId: string, readerId: string): Promise<WorkspaceRole | undefined> {
+    // The authorization read: the reader's role, or undefined when no Membership (Req 8.2, 8.5).
+    const r = await this.pool.query(
+      `SELECT role FROM workspace_members WHERE workspace_id = $1 AND reader_id = $2`,
+      [workspaceId, readerId],
+    );
+    return r.rows[0] ? (r.rows[0].role as WorkspaceRole) : undefined;
+  }
+
+  async workspaceExists(workspaceId: string): Promise<boolean> {
+    // Distinguishes 404 (no such workspace) from 403 (exists, not a member) (Req 8.7).
+    const r = await this.pool.query(`SELECT 1 FROM workspaces WHERE id = $1`, [workspaceId]);
+    return r.rowCount !== null && r.rowCount > 0;
+  }
+
+  async listMembers(workspaceId: string): Promise<Membership[]> {
+    // Members of one workspace only (Req 3.1, 9.8).
+    const r = await this.pool.query(
+      `SELECT reader_id, role FROM workspace_members WHERE workspace_id = $1`,
+      [workspaceId],
+    );
+    return r.rows.map((row) => ({ readerId: row.reader_id, role: row.role as WorkspaceRole }));
+  }
+
+  async removeMember(workspaceId: string, readerId: string): Promise<void> {
+    // Idempotent on an absent membership; caller has enforced owner-only and not-self (Req 3.2).
+    await this.pool.query(
+      `DELETE FROM workspace_members WHERE workspace_id = $1 AND reader_id = $2`,
+      [workspaceId, readerId],
+    );
+  }
+
+  // --- Invitations ---
+
+  async createInvite(workspaceId: string): Promise<string> {
+    // Opaque redeemable token bound to the workspace (Req 2.1). Caller has
+    // enforced owner-only (Req 2.2).
+    const code = randomUUID();
+    await this.pool.query(
+      `INSERT INTO workspace_invites (code, workspace_id) VALUES ($1, $2)`,
+      [code, workspaceId],
+    );
+    return code;
+  }
+
+  async redeemInvite(
+    code: string,
+    readerId: string,
+  ): Promise<{ workspaceId: string; role: WorkspaceRole } | undefined> {
+    const lookup = await this.pool.query(
+      `SELECT workspace_id FROM workspace_invites WHERE code = $1`,
+      [code],
+    );
+    if (!lookup.rows[0]) return undefined; // no match (Req 2.4)
+    const workspaceId = lookup.rows[0].workspace_id as string;
+    // Idempotent membership: insert a Member-Role Membership only if absent, never
+    // duplicating nor changing an existing role (Req 2.3, 2.5).
+    await this.pool.query(
+      `INSERT INTO workspace_members (workspace_id, reader_id, role)
+       VALUES ($1, $2, 'member')
+       ON CONFLICT (workspace_id, reader_id) DO NOTHING`,
+      [workspaceId, readerId],
+    );
+    // Read back the reader's (possibly pre-existing) role.
+    const role = await this.getMembership(workspaceId, readerId);
+    return { workspaceId, role: role ?? 'member' };
+  }
+
+  // --- Shared collections ---
+
+  async createCollection(workspaceId: string, name: string): Promise<SharedCollection> {
+    const id = randomUUID();
+    await this.pool.query(
+      `INSERT INTO shared_collections (id, workspace_id, name) VALUES ($1, $2, $3)`,
+      [id, workspaceId, name],
+    );
+    return { id, name };
+  }
+
+  async listCollections(workspaceId: string): Promise<SharedCollection[]> {
+    // Collections of one workspace only (Req 5.2, 9.8).
+    const r = await this.pool.query(
+      `SELECT id, name FROM shared_collections WHERE workspace_id = $1 ORDER BY created_at DESC, id DESC`,
+      [workspaceId],
+    );
+    return r.rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  async deleteCollection(workspaceId: string, collectionId: string): Promise<void> {
+    // Delete the collection AND its items together in one transaction so a deleted
+    // collection never orphans items (Req 5.5). Scoped to the workspace so a
+    // collection id from another workspace is never touched.
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM collection_items
+          WHERE collection_id IN (
+            SELECT id FROM shared_collections WHERE id = $1 AND workspace_id = $2
+          )`,
+        [collectionId, workspaceId],
+      );
+      await client.query(
+        `DELETE FROM shared_collections WHERE id = $1 AND workspace_id = $2`,
+        [collectionId, workspaceId],
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // --- Collection items ---
+
+  async addCollectionItem(collectionId: string, reportId: string): Promise<void> {
+    // Idempotent upsert; keeps the single existing row and its added_at (Req 6.2, 9.7).
+    await this.pool.query(
+      `INSERT INTO collection_items (collection_id, report_id)
+       VALUES ($1, $2)
+       ON CONFLICT (collection_id, report_id) DO NOTHING`,
+      [collectionId, reportId],
+    );
+  }
+
+  async removeCollectionItem(collectionId: string, reportId: string): Promise<void> {
+    // Absent ⇒ no-op success leaving others unchanged (Req 6.6).
+    await this.pool.query(
+      `DELETE FROM collection_items WHERE collection_id = $1 AND report_id = $2`,
+      [collectionId, reportId],
+    );
+  }
+
+  async listCollectionItems(collectionId: string): Promise<CollectionItemEntry[]> {
+    // Reverse-chronological with deterministic tie-break by report_id DESC (Req 6.4).
+    const r = await this.pool.query(
+      `SELECT report_id, added_at FROM collection_items
+        WHERE collection_id = $1 ORDER BY added_at DESC, report_id DESC`,
+      [collectionId],
+    );
+    return r.rows.map((row) => ({
+      reportId: row.report_id,
+      addedAt: new Date(row.added_at).toISOString(),
+    }));
+  }
+
+  // --- Annotations ---
+
+  async createAnnotation(input: {
+    workspaceId: string;
+    reportId: string;
+    authorId: string;
+    text: string;
+  }): Promise<Annotation> {
+    const id = randomUUID();
+    const r = await this.pool.query(
+      `INSERT INTO annotations (id, workspace_id, report_id, author_id, text)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, workspace_id, report_id, author_id, text, created_at, updated_at`,
+      [id, input.workspaceId, input.reportId, input.authorId, input.text],
+    );
+    return this.rowToAnnotation(r.rows[0]);
+  }
+
+  async listAnnotations(workspaceId: string, reportId: string): Promise<Annotation[]> {
+    // One report within one workspace, most-recently-created first with a
+    // deterministic tie-break; excludes every other workspace's (Req 7.2, 9.8).
+    const r = await this.pool.query(
+      `SELECT id, workspace_id, report_id, author_id, text, created_at, updated_at
+         FROM annotations WHERE workspace_id = $1 AND report_id = $2
+        ORDER BY created_at DESC, id DESC`,
+      [workspaceId, reportId],
+    );
+    return r.rows.map((row) => this.rowToAnnotation(row));
+  }
+
+  async getAnnotation(annotationId: string): Promise<Annotation | undefined> {
+    // Authorization read for edit/delete: the annotation's workspace + author, or
+    // undefined when no such annotation exists (Req 7.4, 7.5).
+    const r = await this.pool.query(
+      `SELECT id, workspace_id, report_id, author_id, text, created_at, updated_at
+         FROM annotations WHERE id = $1`,
+      [annotationId],
+    );
+    return r.rows[0] ? this.rowToAnnotation(r.rows[0]) : undefined;
+  }
+
+  async updateAnnotation(annotationId: string, text: string): Promise<void> {
+    // Updates only the text and updated_at (Req 7.3). Caller has enforced authorization.
+    await this.pool.query(
+      `UPDATE annotations SET text = $2, updated_at = now() WHERE id = $1`,
+      [annotationId, text],
+    );
+  }
+
+  async deleteAnnotation(annotationId: string): Promise<void> {
+    // Caller has enforced authorization (Req 7.5).
+    await this.pool.query(`DELETE FROM annotations WHERE id = $1`, [annotationId]);
   }
 }

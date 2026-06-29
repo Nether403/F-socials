@@ -59,8 +59,23 @@ vi.mock('./analytics', { spy: true });
 import * as analytics from './analytics';
 import App from './App';
 import { Report } from './components/Report';
+import type { UseSession } from './auth/useSession';
 
 const trackSpy = vi.mocked(analytics.track);
+
+// A minimal active session so gated controls (Save/Flag) proceed (Req 6.1). Only the
+// fields Report reads are populated; the rest are inert stubs.
+const activeSession = {
+  session: { accessToken: 'test-token', reader: { id: 'user-1' } },
+  configured: true,
+  loading: false,
+  signUp: vi.fn(),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  clearSession: vi.fn(),
+  handleAuthError: vi.fn(),
+  pendingAction: { current: null },
+} as unknown as UseSession;
 
 // A representative report: provenance (footer + dispute control), a share slug
 // (Share button), one framing signal (Flag button), one claim.
@@ -177,8 +192,8 @@ describe('view + interaction events carry the right category + report id (Req 12
     analytics.grantConsent();
     const user = userEvent.setup();
 
-    // currentUser present so the flag passes the auth gate and actually emits.
-    render(<Report report={report} onBack={() => {}} currentUser={{ id: 'user-1' }} />);
+    // An active session so the flag passes the auth gate and actually emits.
+    render(<Report report={report} onBack={() => {}} session={activeSession} />);
     await user.click(screen.getByRole('button', { name: /framing signals/i }));
     await user.click(screen.getByRole('button', { name: 'Flag this technique' }));
 

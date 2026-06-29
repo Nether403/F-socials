@@ -1,11 +1,16 @@
 import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
-import { Moon, Sun } from 'lucide-react';
-import { detectInput, getReportBySlug, pollReport, submitAnalysis } from './api/client';
+import { LogIn, LogOut, Bookmark, Moon, Sun, Users } from 'lucide-react';
+import { detectInput, getReport, getReportBySlug, pollReport, submitAnalysis } from './api/client';
 import { track } from './analytics';
 import type { AnalysisReport } from './api/types';
 import { Report } from './components/Report';
 import { Methodology } from './components/Methodology';
 import { ReviewerConsole } from './components/ReviewerConsole';
+import { AuthPanel } from './components/AuthPanel';
+import { HistoryView } from './components/HistoryView';
+import { WorkspaceListView } from './components/WorkspaceListView';
+import { WorkspaceDetailView } from './components/WorkspaceDetailView';
+import { useSession } from './auth/useSession';
 
 type View =
   | { kind: 'home' }
@@ -13,6 +18,10 @@ type View =
   | { kind: 'report'; report: AnalysisReport; shared?: boolean }
   | { kind: 'methodology' }
   | { kind: 'review' }
+  | { kind: 'sign-in' }
+  | { kind: 'history' }
+  | { kind: 'workspaces' }
+  | { kind: 'workspace-detail'; workspaceId: string }
   | { kind: 'error'; message: string };
 
 // Render-time guard for the Methodology page (Requirement 1.12). If the page
@@ -72,6 +81,13 @@ export default function App() {
   const [input, setInput] = useState('');
   const [view, setView] = useState<View>({ kind: 'home' });
   const [stepIdx, setStepIdx] = useState(0);
+  // The single session instance for the whole app (Req owns one useSession): it
+  // restores a persisted session on load, tracks refresh/expiry, and on a 401
+  // clears the session so the app falls back to the Anonymous experience (Req 4.4).
+  const session = useSession();
+  // Transient header notice, e.g. the sign-out-failed warning that the remote
+  // session may still be active (Req 3.5). Announced via an ARIA live region.
+  const [notice, setNotice] = useState<string | null>(null);
   const stepTimer = useRef<number | undefined>(undefined);
   // Track the live view so the hash handler (a stable closure) can read it, and
   // remember the last report view to restore when the reader leaves Methodology (1.12).
@@ -84,6 +100,12 @@ export default function App() {
   // The last view we emitted a 'view' analytics event for, so each distinct view
   // (route + report id) emits exactly once despite re-renders / StrictMode double-invoke.
   const lastViewKeyRef = useRef<string | null>(null);
+  // Retained Workspace_View target for the post-sign-in return (Req 13.4). It holds
+  // the workspace hash WHILE the reader is on a workspace route and is cleared at the
+  // top of every hash resolution, so it is only ever set for the workspace route the
+  // reader is currently viewing. afterAuthSuccess prefers it over the gated-report
+  // pending action so an anonymous reader who opened a Workspace_View returns to it.
+  const pendingWorkspaceTarget = useRef<string | null>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -93,6 +115,10 @@ export default function App() {
   useEffect(() => {
     async function loadFromHash() {
       const hash = window.location.hash;
+      // Only retain a Workspace_View target while the reader is actually on a
+      // workspace route; clearing here first keeps the ref from leaking to a later
+      // sign-in started from a different surface (Req 13.4).
+      pendingWorkspaceTarget.current = null;
       const shareMatch = hash.match(/^#\/r\/([A-Za-z0-9]+)/);
       if (shareMatch) {
         loadShared(shareMatch[1]);
@@ -107,6 +133,34 @@ export default function App() {
       // #/review serves the reviewer console (Req 11.1). Hash routing only.
       if (/^#\/review\b/.test(hash)) {
         setView({ kind: 'review' });
+        return;
+      }
+      // #/sign-in serves the accounts surface (Req 14.1). Session-gating is done at
+      // render time (the session restores asynchronously), so the hash handler just
+      // selects the view.
+      if (/^#\/sign-in\b/.test(hash)) {
+        setView({ kind: 'sign-in' });
+        return;
+      }
+      // #/history serves the saved-report History_View (Req 14.1). Anonymous readers
+      // are redirected to the sign-in surface at render time (Req 9 gating).
+      if (/^#\/history\b/.test(hash)) {
+        setView({ kind: 'history' });
+        return;
+      }
+      // #/workspaces/<id> serves a single Workspace_Detail_View; #/workspaces (no id)
+      // serves the Workspace list (Req 13.1, hash routing only). Session-gating is done
+      // at render time. The target hash is retained so an anonymous-but-configured
+      // reader returns here after signing in (Req 13.4).
+      const workspaceDetailMatch = hash.match(/^#\/workspaces\/([^/?#]+)/);
+      if (workspaceDetailMatch) {
+        pendingWorkspaceTarget.current = hash;
+        setView({ kind: 'workspace-detail', workspaceId: decodeURIComponent(workspaceDetailMatch[1]) });
+        return;
+      }
+      if (/^#\/workspaces\b/.test(hash)) {
+        pendingWorkspaceTarget.current = hash;
+        setView({ kind: 'workspaces' });
         return;
       }
     }
@@ -130,6 +184,72 @@ export default function App() {
   function goHome() {
     if (window.location.hash) window.location.hash = '';
     setView({ kind: 'home' });
+  }
+
+  // Hash-route navigation to the account surfaces; the hash handler maps these to
+  // the matching view (Req 14.1, hash routing only).
+  function goSignIn() {
+    window.location.hash = '#/sign-in';
+  }
+  function goHistory() {
+    window.location.hash = '#/history';
+  }
+  // Workspace_View navigation (Req 13.1, hash routing only).
+  function goWorkspaces() {
+    window.location.hash = '#/workspaces';
+  }
+  function openWorkspace(workspaceId: string) {
+    window.location.hash = `#/workspaces/${encodeURIComponent(workspaceId)}`;
+  }
+
+  // Open a full report by id (used by the History_View select-to-open, Req 9.5, and
+  // the post-sign-in return to a gated report). Clears the hash so the report view
+  // owns the screen, then loads it; a 401 is piped through the session layer so an
+  // expired token falls back to Anonymous (Req 4.4).
+  async function openReport(id: string) {
+    if (window.location.hash) window.location.hash = '';
+    setView({ kind: 'loading', status: 'loading report' });
+    try {
+      const report = await getReport(id);
+      setView({ kind: 'report', report });
+    } catch (e) {
+      session.handleAuthError(e);
+      setView({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  // End the session. useSession discards the local session even when the remote
+  // sign-out rejects and rethrows, so on failure we still present Anonymous and warn
+  // the remote session may persist (Req 3.5). Always returns to the home view.
+  async function handleSignOut() {
+    setNotice(null);
+    try {
+      await session.signOut();
+    } catch {
+      setNotice('You are signed out on this device, but the remote session may still be active.');
+    }
+    goHome();
+  }
+
+  // After a successful sign-in/sign-up: return to a retained Workspace_View if the
+  // reader opened one while anonymous (Req 13.4), else to a gated report if one was
+  // pending (Req 6.7; control re-enable is wired in Report.tsx), otherwise go home.
+  function afterAuthSuccess() {
+    const workspaceTarget = pendingWorkspaceTarget.current;
+    if (workspaceTarget) {
+      // The hash is already the workspace target and the view state already reflects
+      // it; with the session now active the gating renders the Workspace_View. Re-set
+      // the hash only if it drifted, which re-triggers routing.
+      if (window.location.hash !== workspaceTarget) window.location.hash = workspaceTarget;
+      return;
+    }
+    const pending = session.pendingAction.current;
+    if (pending) {
+      session.pendingAction.current = null;
+      void openReport(pending.reportId);
+    } else {
+      goHome();
+    }
   }
 
   // Leaving Methodology restores the reader's prior report context if there was one (1.12).
@@ -190,14 +310,46 @@ export default function App() {
             f-Socials <small>· a lens, not a judge</small>
           </span>
         </div>
-        <button
-          className="icon-btn"
-          aria-label="Toggle theme"
-          onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        <div className="topbar-actions">
+          {/* Header sign-in/sign-out affordance reflecting session state (Req 2.2, 3.3).
+              Icons are paired with visible text labels (color/icon-never-alone, Req 14.3);
+              every control is a real <button> with an accessible name (Req 14.2, 14.4). */}
+          {session.session ? (
+            <>
+              <button className="btn btn-ghost" onClick={goWorkspaces}>
+                <Users size={15} aria-hidden="true" /> Workspaces
+              </button>
+              <button className="btn btn-ghost" onClick={goHistory}>
+                <Bookmark size={15} aria-hidden="true" /> Saved reports
+              </button>
+              <button className="btn btn-ghost" onClick={() => void handleSignOut()}>
+                <LogOut size={15} aria-hidden="true" /> Sign out
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-ghost" onClick={goSignIn}>
+              <LogIn size={15} aria-hidden="true" /> Sign in
+            </button>
+          )}
+          <button
+            className="icon-btn"
+            aria-label="Toggle theme"
+            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
       </header>
+
+      {/* Header-level status notice (e.g. the sign-out-failed warning, Req 3.5),
+          announced through an ARIA live region without requiring a focus change (Req 14.9). */}
+      <div aria-live="polite" role="status">
+        {notice && (
+          <div className="banner error" style={{ margin: '0 24px' }}>
+            {notice}
+          </div>
+        )}
+      </div>
 
       <div className="container">
         {view.kind === 'home' && (
@@ -231,7 +383,13 @@ export default function App() {
         )}
 
         {view.kind === 'report' && (
-          <Report report={view.report} shared={view.shared} onBack={goHome} />
+          <Report
+            report={view.report}
+            shared={view.shared}
+            onBack={goHome}
+            session={session}
+            onRequireSignIn={goSignIn}
+          />
         )}
 
         {view.kind === 'methodology' && (
@@ -241,6 +399,87 @@ export default function App() {
         )}
 
         {view.kind === 'review' && <ReviewerConsole onBack={goHome} />}
+
+        {/* Accounts surface (Req 14.1). AuthPanel itself renders the unavailable
+            message and no form when not Auth_Configured (Req 5.1). On success we
+            return to a pending gated report or go home. */}
+        {view.kind === 'sign-in' && (
+          <AuthPanel session={session} onSuccess={afterAuthSuccess} />
+        )}
+
+        {/* History_View is gated on an active session token. While the session is
+            still restoring we show the loading state; an Anonymous reader is
+            redirected to the sign-in surface (Req 9 gating); a 401 during load clears
+            the session via onAuthError and this falls back to Anonymous (Req 4.4). */}
+        {view.kind === 'history' &&
+          (session.loading ? (
+            <Loading status="restoring your session" stepIdx={0} />
+          ) : session.session ? (
+            <HistoryView
+              token={session.session.accessToken}
+              onOpenReport={openReport}
+              onBack={goHome}
+              onAuthError={session.handleAuthError}
+            />
+          ) : (
+            <AuthPanel session={session} onSuccess={afterAuthSuccess} />
+          ))}
+
+        {/* Workspace list (#/workspaces). While the session restores we show loading.
+            When not Auth_Configured the WorkspaceListView itself renders the
+            features-unavailable message and no create/redeem forms, and never crashes
+            (Req 12.1, 12.4). When Auth_Configured but anonymous, opening a Workspace_View
+            presents the sign-in flow while the workspace hash is retained, so the reader
+            returns here after signing in (Req 13.4). A 401 raised by a workspace call is
+            piped through onAuthError so the session is torn down and the app falls back to
+            Anonymous (Req 13.5). */}
+        {view.kind === 'workspaces' &&
+          (session.loading ? (
+            <Loading status="restoring your session" stepIdx={0} />
+          ) : !session.configured ? (
+            <WorkspaceListView
+              isAuthConfigured={false}
+              onOpenWorkspace={openWorkspace}
+              onBack={goHome}
+            />
+          ) : session.session ? (
+            <WorkspaceListView
+              isAuthConfigured
+              token={session.session.accessToken}
+              onOpenWorkspace={openWorkspace}
+              onBack={goHome}
+              onAuthError={session.handleAuthError}
+            />
+          ) : (
+            <AuthPanel session={session} onSuccess={afterAuthSuccess} />
+          ))}
+
+        {/* Workspace detail (#/workspaces/:id). Same session gating as the list; the
+            detail view requires an active session (token + reader id), so it only renders
+            with one. When not Auth_Configured the list view's unavailable message stands in
+            so boot never crashes (Req 12.4). A 403 access-denied message is rendered inside
+            WorkspaceDetailView (Req 13.6); a 401 falls back to Anonymous via onAuthError
+            (Req 13.5). */}
+        {view.kind === 'workspace-detail' &&
+          (session.loading ? (
+            <Loading status="restoring your session" stepIdx={0} />
+          ) : !session.configured ? (
+            <WorkspaceListView
+              isAuthConfigured={false}
+              onOpenWorkspace={openWorkspace}
+              onBack={goHome}
+            />
+          ) : session.session ? (
+            <WorkspaceDetailView
+              workspaceId={view.workspaceId}
+              token={session.session.accessToken}
+              currentReaderId={session.session.reader.id}
+              onBack={goWorkspaces}
+              onAuthError={session.handleAuthError}
+            />
+          ) : (
+            <AuthPanel session={session} onSuccess={afterAuthSuccess} />
+          ))}
       </div>
     </div>
   );

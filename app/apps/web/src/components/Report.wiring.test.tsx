@@ -86,28 +86,4 @@ describe('Report footer + dispute modal wiring', () => {
 
     expect(await screen.findByText(/received/i)).toBeInTheDocument();
   });
-
-  // 3.11 — an anonymous Save shows the auth prompt and submits nothing.
-  it('shows an auth prompt when an anonymous user saves', async () => {
-    const user = userEvent.setup();
-    render(<Report report={fakeReport} onBack={() => {}} currentUser={null} />);
-
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
-    expect(screen.getByText(/sign in to save/i)).toBeInTheDocument();
-  });
-
-  // 3.11 — an anonymous Flag shows the auth prompt and never calls submitFlag.
-  it('shows an auth prompt when an anonymous user flags a technique', async () => {
-    const user = userEvent.setup();
-    render(<Report report={fakeReport} onBack={() => {}} currentUser={null} />);
-
-    // Flag controls live on the Framing Signals tab.
-    await user.click(screen.getByRole('button', { name: /framing signals/i }));
-    // Exact name: the surrounding signal card is also role="button" and its
-    // accessible name contains this text, so an exact match targets the Flag button.
-    await user.click(screen.getByRole('button', { name: 'Flag this technique' }));
-
-    expect(screen.getByText(/sign in to flag/i)).toBeInTheDocument();
-    expect(api.submitFlag).not.toHaveBeenCalled();
-  });
 });

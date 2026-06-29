@@ -2,12 +2,24 @@
 
 import { randomUUID } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
-import type { Cache, Queue, RateLimiter, Repository, Telemetry } from '../infra/ports';
+import type { Cache, Queue, RateLimiter, Repository, Telemetry, WorkspaceRole } from '../infra/ports';
 import type { AnalysisReport, ContentItem, RawInput } from '../types';
 import { cacheKey } from '../core/hash';
 import { policyDescriptor } from '../core/sourceTier';
 import { deriveReportReviewStatus } from '../core/reportReviewStatus';
-import { submitSchema, disputeSchema, flagSchema, reviewQueueQuerySchema, reviewResolutionSchema } from './validation';
+import {
+  submitSchema,
+  disputeSchema,
+  flagSchema,
+  reviewQueueQuerySchema,
+  reviewResolutionSchema,
+  reportIdParam,
+  workspaceNameSchema,
+  collectionNameSchema,
+  collectionItemSchema,
+  annotationTextSchema,
+  inviteCodeParam,
+} from './validation';
 import { requireAuth, reviewerGuard } from './auth';
 
 export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter; telemetry: Telemetry }): Router {
@@ -16,6 +28,33 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
   const paramId = (req: Request): string | undefined => {
     const v = req.params.id;
     return Array.isArray(v) ? v[0] : v;
+  };
+
+  const getParam = (req: Request, key: string): string | undefined => {
+    const v = req.params[key];
+    return Array.isArray(v) ? v[0] : v;
+  };
+
+  // The single workspace authorization decision (Req 8.2, 8.3, 8.5, 8.7). Returns
+  // the reader's role on success, or writes the 404/403 response and returns
+  // undefined. Workspace non-existence is checked FIRST so a missing workspace
+  // yields 404 and an existing-but-not-mine workspace yields 403 (the 404-before-403
+  // information policy). Owner-only routes additionally require role === 'owner'.
+  const loadMembership = async (
+    res: Response,
+    workspaceId: string,
+    readerId: string,
+  ): Promise<WorkspaceRole | undefined> => {
+    if (!(await deps.repo.workspaceExists(workspaceId))) {
+      res.status(404).json({ error: 'not_found' }); // Req 8.7
+      return undefined;
+    }
+    const role = await deps.repo.getMembership(workspaceId, readerId);
+    if (role === undefined) {
+      res.status(403).json({ error: 'forbidden' }); // Req 8.2
+      return undefined;
+    }
+    return role;
   };
 
   // Review_Item id is "{kind}:{sourceId}". Split on the first ':' only (a sourceId
@@ -189,6 +228,42 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     return res.status(201).json({ ok: true });
   });
 
+  // --- Saved reports (accounts-save-history) -------------------------------
+  // All three are behind requireAuth (Req 10.1–10.3, 10.6) and scoped to the
+  // verified reader req.user!.id (Req 10.5). Persistence goes through Repository
+  // methods only — no SQL here (Req 11.1). Telemetry carries the report id only,
+  // never the reader id, matching the flag-event convention (Req 12.4, 12.5).
+
+  // POST /api/v1/analyses/:id/save — save a report to the reader's account.
+  router.post('/analyses/:id/save', requireAuth, async (req: Request, res: Response) => {
+    const parsed = reportIdParam.safeParse(paramId(req));
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_id' }); // Req 10.4
+    const id = parsed.data;
+    const report = await deps.repo.getReport(id);
+    if (!report) return res.status(404).json({ error: 'not_found' }); // Req 7.4
+    await deps.repo.saveSavedReport(req.user!.id, id); // idempotent (Req 7.3)
+    deps.telemetry.emit('save', { reportId: id });
+    return res.status(200).json({ ok: true, saved: true });
+  });
+
+  // DELETE /api/v1/analyses/:id/save — remove a report from the reader's set.
+  // Idempotent success even when the report was never saved — no 404 (Req 8.3, 10.7).
+  router.delete('/analyses/:id/save', requireAuth, async (req: Request, res: Response) => {
+    const parsed = reportIdParam.safeParse(paramId(req));
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_id' }); // Req 10.4
+    const id = parsed.data;
+    await deps.repo.removeSavedReport(req.user!.id, id);
+    deps.telemetry.emit('unsave', { reportId: id });
+    return res.status(200).json({ ok: true, saved: false });
+  });
+
+  // GET /api/v1/saved-reports — reverse-chronological history for the verified
+  // reader (Req 9.1, 9.6). [] when the reader has no saves (Req 10.8).
+  router.get('/saved-reports', requireAuth, async (req: Request, res: Response) => {
+    const entries = await deps.repo.listSavedReports(req.user!.id);
+    return res.status(200).json(entries);
+  });
+
   // --- Review workflow (expert-review-queue) -------------------------------
   // Every review route is behind requireAuth + reviewerGuard (Req 1.5): a
   // missing/invalid token → 401 (requireAuth), an authenticated non-reviewer
@@ -242,6 +317,235 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
     });
     if (result.ok) return res.status(200).json({ item: result.item }); // Req 4.1, 4.5
     return res.status(404).json({ error: 'review_item_not_found' }); // Req 4.4
+  });
+
+  // --- Institutional workspace (institutional-workspace) -------------------
+  // Every route is behind requireAuth (Req 8.1); the reader is always the verified
+  // req.user!.id. Workspace-scoped routes call loadMembership before any read or
+  // write (Req 8.2, 8.5), with owner-only routes additionally requiring the Owner
+  // Role (Req 8.3). Persistence goes through Repository methods only — no SQL here
+  // (Req 9.1). Telemetry carries the workspace/report id only, never the reader id.
+
+  // POST /api/v1/workspaces — create a workspace; seeds the owner Membership (Req 1.1, 1.2).
+  router.post('/workspaces', requireAuth, async (req: Request, res: Response) => {
+    const parsed = workspaceNameSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() }); // Req 1.4
+    const summary = await deps.repo.createWorkspace(req.user!.id, parsed.data.name);
+    deps.telemetry.emit('workspace_create', { workspaceId: summary.id });
+    return res.status(201).json(summary);
+  });
+
+  // GET /api/v1/workspaces — the reader's workspaces; [] when none (Req 4.1, 4.3).
+  router.get('/workspaces', requireAuth, async (req: Request, res: Response) => {
+    const list = await deps.repo.listWorkspacesForReader(req.user!.id);
+    return res.status(200).json(list);
+  });
+
+  // POST /api/v1/workspaces/:id/invites — owner-only invite issuance (Req 2.1, 2.2).
+  router.post('/workspaces/:id/invites', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    if (role !== 'owner') return res.status(403).json({ error: 'forbidden' }); // Req 2.2
+    const code = await deps.repo.createInvite(id);
+    deps.telemetry.emit('workspace_invite', { workspaceId: id });
+    return res.status(200).json({ code });
+  });
+
+  // POST /api/v1/invites/:code/redeem — redeem a code; 404 unknown (Req 2.3, 2.4, 2.5).
+  router.post('/invites/:code/redeem', requireAuth, async (req: Request, res: Response) => {
+    const parsed = inviteCodeParam.safeParse(getParam(req, 'code'));
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
+    const result = await deps.repo.redeemInvite(parsed.data, req.user!.id);
+    if (!result) return res.status(404).json({ error: 'not_found' }); // Req 2.4
+    deps.telemetry.emit('workspace_redeem', { workspaceId: result.workspaceId });
+    return res.status(200).json(result); // { workspaceId, role }
+  });
+
+  // GET /api/v1/workspaces/:id/members — member-scoped member list (Req 3.1).
+  router.get('/workspaces/:id/members', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const members = await deps.repo.listMembers(id);
+    return res.status(200).json(members);
+  });
+
+  // DELETE /api/v1/workspaces/:id/members/:readerId — owner-only removal; the owner
+  // cannot remove their own Membership (Req 3.2, 3.3, 3.4).
+  router.delete('/workspaces/:id/members/:readerId', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    const targetReader = getParam(req, 'readerId');
+    if (!id || !targetReader) return res.status(400).json({ error: 'missing_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    if (role !== 'owner') return res.status(403).json({ error: 'forbidden' }); // Req 3.3
+    // Owner self-removal → 400 BEFORE any delete; the Owner Membership is untouched (Req 3.4).
+    if (targetReader === req.user!.id) return res.status(400).json({ error: 'cannot_remove_self' });
+    await deps.repo.removeMember(id, targetReader);
+    deps.telemetry.emit('workspace_member_remove', { workspaceId: id });
+    return res.status(200).json({ ok: true });
+  });
+
+  // POST /api/v1/workspaces/:id/collections — member creates a collection (Req 5.1).
+  router.post('/workspaces/:id/collections', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const parsed = collectionNameSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() }); // Req 5.4
+    const collection = await deps.repo.createCollection(id, parsed.data.name);
+    deps.telemetry.emit('collection_create', { workspaceId: id });
+    return res.status(201).json(collection);
+  });
+
+  // GET /api/v1/workspaces/:id/collections — member lists collections (Req 5.2).
+  router.get('/workspaces/:id/collections', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const collections = await deps.repo.listCollections(id);
+    return res.status(200).json(collections);
+  });
+
+  // DELETE /api/v1/workspaces/:id/collections/:cid — owner-only; drops the
+  // collection and its items together (Req 5.5, 5.6).
+  router.delete('/workspaces/:id/collections/:cid', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const cid = reportIdParam.safeParse(getParam(req, 'cid'));
+    if (!cid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    if (role !== 'owner') return res.status(403).json({ error: 'forbidden' }); // Req 5.6
+    await deps.repo.deleteCollection(id, cid.data);
+    deps.telemetry.emit('collection_delete', { workspaceId: id });
+    return res.status(200).json({ ok: true });
+  });
+
+  // POST /api/v1/workspaces/:id/collections/:cid/items — member adds a report;
+  // idempotent; 404 when the report does not exist (Req 6.1, 6.2, 6.3).
+  router.post('/workspaces/:id/collections/:cid/items', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const cid = reportIdParam.safeParse(getParam(req, 'cid'));
+    if (!cid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const parsed = collectionItemSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+    const report = await deps.repo.getReport(parsed.data.reportId);
+    if (!report) return res.status(404).json({ error: 'not_found' }); // Req 6.3
+    await deps.repo.addCollectionItem(cid.data, parsed.data.reportId);
+    deps.telemetry.emit('collection_item_add', { workspaceId: id, reportId: parsed.data.reportId });
+    return res.status(200).json({ ok: true });
+  });
+
+  // GET /api/v1/workspaces/:id/collections/:cid/items — member lists items,
+  // most-recently-added first (Req 6.4).
+  router.get('/workspaces/:id/collections/:cid/items', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const cid = reportIdParam.safeParse(getParam(req, 'cid'));
+    if (!cid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const items = await deps.repo.listCollectionItems(cid.data);
+    return res.status(200).json(items);
+  });
+
+  // DELETE /api/v1/workspaces/:id/collections/:cid/items/:reportId — member
+  // removes a report; success even if absent (Req 6.5, 6.6).
+  router.delete('/workspaces/:id/collections/:cid/items/:reportId', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const cid = reportIdParam.safeParse(getParam(req, 'cid'));
+    if (!cid.success) return res.status(400).json({ error: 'invalid_id' });
+    const rid = reportIdParam.safeParse(getParam(req, 'reportId'));
+    if (!rid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    await deps.repo.removeCollectionItem(cid.data, rid.data);
+    deps.telemetry.emit('collection_item_remove', { workspaceId: id, reportId: rid.data });
+    return res.status(200).json({ ok: true });
+  });
+
+  // POST /api/v1/workspaces/:id/reports/:reportId/annotations — member annotates a
+  // report; 404 when the report does not exist (Req 7.1, 7.6, 7.7).
+  router.post('/workspaces/:id/reports/:reportId/annotations', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const rid = reportIdParam.safeParse(getParam(req, 'reportId'));
+    if (!rid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const parsed = annotationTextSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() }); // Req 7.6
+    const report = await deps.repo.getReport(rid.data);
+    if (!report) return res.status(404).json({ error: 'not_found' }); // Req 7.7
+    const annotation = await deps.repo.createAnnotation({
+      workspaceId: id,
+      reportId: rid.data,
+      authorId: req.user!.id,
+      text: parsed.data.text,
+    });
+    deps.telemetry.emit('annotation_create', { workspaceId: id, reportId: rid.data });
+    return res.status(201).json(annotation);
+  });
+
+  // GET /api/v1/workspaces/:id/reports/:reportId/annotations — member lists the
+  // report's annotations in this workspace, most-recently-created first (Req 7.2).
+  router.get('/workspaces/:id/reports/:reportId/annotations', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const rid = reportIdParam.safeParse(getParam(req, 'reportId'));
+    if (!rid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const annotations = await deps.repo.listAnnotations(id, rid.data);
+    return res.status(200).json(annotations);
+  });
+
+  // PATCH /api/v1/workspaces/:id/annotations/:aid — author-or-owner edits the text
+  // (Req 7.3, 7.4, 7.6). An annotation absent or in another workspace → 404.
+  router.patch('/workspaces/:id/annotations/:aid', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const aid = reportIdParam.safeParse(getParam(req, 'aid'));
+    if (!aid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const parsed = annotationTextSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() }); // Req 7.6
+    const annotation = await deps.repo.getAnnotation(aid.data);
+    if (!annotation || annotation.workspaceId !== id) return res.status(404).json({ error: 'not_found' });
+    // Author-or-owner predicate (Req 7.3, 7.4).
+    if (annotation.authorId !== req.user!.id && role !== 'owner') return res.status(403).json({ error: 'forbidden' });
+    await deps.repo.updateAnnotation(aid.data, parsed.data.text);
+    deps.telemetry.emit('annotation_update', { workspaceId: id, reportId: annotation.reportId });
+    return res.status(200).json({ ok: true });
+  });
+
+  // DELETE /api/v1/workspaces/:id/annotations/:aid — author-or-owner deletes
+  // (Req 7.4, 7.5). An annotation absent or in another workspace → 404.
+  router.delete('/workspaces/:id/annotations/:aid', requireAuth, async (req: Request, res: Response) => {
+    const id = getParam(req, 'id');
+    if (!id) return res.status(400).json({ error: 'missing_id' });
+    const aid = reportIdParam.safeParse(getParam(req, 'aid'));
+    if (!aid.success) return res.status(400).json({ error: 'invalid_id' });
+    const role = await loadMembership(res, id, req.user!.id);
+    if (role === undefined) return;
+    const annotation = await deps.repo.getAnnotation(aid.data);
+    if (!annotation || annotation.workspaceId !== id) return res.status(404).json({ error: 'not_found' });
+    // Author-or-owner predicate (Req 7.4, 7.5).
+    if (annotation.authorId !== req.user!.id && role !== 'owner') return res.status(403).json({ error: 'forbidden' });
+    await deps.repo.deleteAnnotation(aid.data);
+    deps.telemetry.emit('annotation_delete', { workspaceId: id, reportId: annotation.reportId });
+    return res.status(200).json({ ok: true });
   });
 
   // GET /api/v1/policy — PUBLIC source-tier policy descriptor (no auth). Powers

@@ -11,7 +11,6 @@ import {
   HelpCircle,
   Share2,
   ShieldCheck,
-  X,
 } from 'lucide-react';
 import type {
   AnalysisReport,
@@ -22,7 +21,8 @@ import type {
   SourceTier,
   Verifiability,
 } from '../api/types';
-import { submitFlag } from '../api/client';
+import { AuthExpiredError, saveReport, submitFlag } from '../api/client';
+import type { GatedControl, UseSession } from '../auth/useSession';
 import { track } from '../analytics';
 import { DisputeModal } from './DisputeModal';
 import { SummaryLead } from './SummaryLead';
@@ -98,53 +98,132 @@ export function topFramingSignal(signals: FramingSignal[]): FramingSignal | unde
   );
 }
 
+// A save that does not confirm within 10 seconds is treated as a failure so the
+// reader can retry (Req 7.7). ponytail: the underlying fetch is left to settle on
+// its own; the upgrade path is an AbortController if we ever need to cancel it.
+const SAVE_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Shown when a reader activates Save/Flag while account features are not configured
+// (Req 5.3): the message appears, no request is sent, and the view is unchanged.
+const ACCOUNT_UNAVAILABLE_MSG =
+  'Account features are unavailable right now, so this report cannot be saved here.';
+
 export function Report({
   report,
   onBack,
   shared,
-  currentUser,
+  session,
+  onRequireSignIn,
 }: {
   report: AnalysisReport;
   onBack: () => void;
   shared?: boolean;
-  // The signed-in user, if any. No auth system is wired into the web app yet, so this
-  // is absent today and the auth-gated Flag/Save controls always show the prompt (3.11).
-  currentUser?: { id: string } | null;
+  // The shared session hook (App owns the single instance). Absent in contexts that
+  // render a report without accounts wiring (e.g. isolated tests); treated as
+  // Anonymous + not-configured so Save/Flag degrade safely.
+  session?: UseSession;
+  // Navigate to the sign-in surface. Report records the pending gated action on the
+  // session first, so a successful sign-in returns the reader here (Req 6.2, 6.7).
+  onRequireSignIn?: () => void;
 }) {
-  // Dispute_Modal mount seam (Req 3.10). Task 11.2 swaps the placeholder below
-  // for the real <Dispute_Modal reportId={report.id} .../> driven by this state.
+  // Dispute_Modal mount seam (Req 3.10).
   const [disputeOpen, setDisputeOpen] = useState(false);
-  // Auth-gate state for Flag/Save (Req 3.11): when an anonymous user activates either
-  // control we surface this prompt and do NOT submit. `saved` is the local Save toggle.
-  const [authPrompt, setAuthPrompt] = useState<string | null>(null);
+  // Save_Control state (Req 7): `saved` drives the saved indicator, `savePending`
+  // disables + debounces the control while in flight (Req 7.6), `saveError` carries
+  // the "save did not complete" text (Req 7.7).
   const [saved, setSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Flag_Control state (Req 6): the technique whose flag request is in flight (so we
+  // disable just that control, Req 6.5) and the "action not recorded" text (Req 6.6).
+  const [flagBusy, setFlagBusy] = useState<string | null>(null);
+  const [flagError, setFlagError] = useState<string | null>(null);
+  // The account-features-unavailable notice for the not-configured path (Req 5.3).
+  const [unavailable, setUnavailable] = useState<string | null>(null);
   // Opener of the Dispute_Modal, so we can restore focus to it on close (Req 4.7).
   const disputeOpenerRef = useRef<HTMLButtonElement>(null);
 
-  // Run `action` when signed in; otherwise prompt to authenticate and submit nothing.
-  function gated(label: string, action: () => void) {
-    if (!currentUser) {
-      setAuthPrompt(`Please sign in to ${label}.`);
-      return;
+  const token = session?.session?.accessToken ?? null;
+  const configured = session?.configured ?? false;
+
+  // Decide whether a gated action (Save/Flag) may proceed. Returns true only when a
+  // Session is active (Req 6.1). With no session but Auth_Configured it records the
+  // pending control and routes to sign-in, retaining the report context (Req 6.2,
+  // 6.7). When not configured it shows the unavailable message and sends nothing
+  // (Req 5.3). In every blocked case it returns false so the caller submits nothing.
+  function canProceed(control: GatedControl): boolean {
+    if (token) return true;
+    if (configured) {
+      if (session) session.pendingAction.current = { reportId: report.id, control };
+      onRequireSignIn?.();
+      return false;
     }
-    setAuthPrompt(null);
-    action();
+    setUnavailable(ACCOUNT_UNAVAILABLE_MSG);
+    return false;
   }
 
-  function onSave() {
-    // ponytail: Save is a client-only toggle until a saved-reports endpoint exists;
-    // the upgrade path is a POST /me/saves call here, behind the same auth gate.
-    gated('save this report', () => setSaved((s) => !s));
+  // Save the report to the reader's account (Req 7). Ignores re-activations while a
+  // request is pending (Req 7.6). On success shows the saved indicator (Req 7.2); on
+  // a 401 the session clears and the app falls back to Anonymous (Req 4.4); on any
+  // other failure or a >10s timeout it shows "save did not complete" and re-enables
+  // the control for retry without showing the saved indicator (Req 7.7).
+  async function onSave() {
+    if (savePending) return;
+    if (!canProceed('save')) return;
+    const accessToken = token!;
+    setSavePending(true);
+    setSaveError(null);
+    setUnavailable(null);
+    try {
+      await withTimeout(
+        saveReport(report.id, accessToken),
+        SAVE_TIMEOUT_MS,
+        'The save did not complete in time. Please try again.',
+      );
+      track('save', { reportId: report.id }); // Web_Analytics interaction event
+      setSaved(true);
+    } catch (e) {
+      if (e instanceof AuthExpiredError) {
+        session?.handleAuthError(e); // 401 → clear session (Req 4.4); no failure text
+      } else {
+        setSaveError('The save did not complete. Please try again.'); // Req 7.7
+      }
+    } finally {
+      setSavePending(false); // re-enable for retry on any outcome (Req 7.7)
+    }
   }
 
-  function onFlag(technique: string) {
-    gated('flag a framing technique', () => {
-      // Only reachable when authenticated; the endpoint enforces requireAuth too (3.3, 3.4).
+  // Flag a framing technique (Req 6). Disables the activated control while in flight
+  // (Req 6.5) and ignores other flag activations meanwhile. On a 401 the session
+  // clears (Req 4.4); any other failure shows "action not recorded" and re-enables
+  // the control (Req 6.6). The token is attached on send (Req 6.3, 7.1).
+  async function onFlag(technique: string) {
+    if (flagBusy) return;
+    if (!canProceed('flag')) return;
+    const accessToken = token!;
+    setFlagBusy(technique);
+    setFlagError(null);
+    setUnavailable(null);
+    try {
       track('flag', { reportId: report.id }); // Web_Analytics interaction event (Req 12.2)
-      void submitFlag(report.id, { technique }).catch(() => {
-        /* surfacing flag-submit errors is out of scope for this task */
-      });
-    });
+      await submitFlag(report.id, { technique }, accessToken);
+    } catch (e) {
+      if (e instanceof AuthExpiredError) {
+        session?.handleAuthError(e);
+      } else {
+        setFlagError('That action was not recorded. Please try again.'); // Req 6.6
+      }
+    } finally {
+      setFlagBusy(null);
+    }
   }
 
   // Per-section item counts surfaced on each drawer control; each equals its collection length
@@ -169,28 +248,29 @@ export function Report({
           <button
             className="btn btn-ghost"
             style={{ height: 38, padding: '0 14px', flexShrink: 0 }}
-            onClick={onSave}
+            onClick={() => void onSave()}
+            disabled={savePending}
             aria-pressed={saved}
+            aria-busy={savePending}
           >
-            {saved ? <Check size={15} /> : <Bookmark size={15} />} {saved ? 'Saved' : 'Save'}
+            {/* Color/icon-never-alone: a visible text label sits beside the icon for
+                every state, including "Saved" (Req 7.2, 14.3). */}
+            {saved ? <Check size={15} /> : <Bookmark size={15} />}{' '}
+            {savePending ? 'Saving…' : saved ? 'Saved' : 'Save'}
           </button>
           {report.shareSlug && <ShareButton slug={report.shareSlug} reportId={report.id} />}
         </div>
       </div>
 
-      {authPrompt && (
-        <div className="banner auth-prompt" role="status">
-          <span>{authPrompt}</span>
-          <button
-            type="button"
-            className="auth-prompt-dismiss"
-            onClick={() => setAuthPrompt(null)}
-            aria-label="Dismiss sign-in prompt"
-          >
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      {/* Account/action notices for Save and Flag, announced through an ARIA live
+          region so assistive tech hears them without a focus change (Req 14.9):
+          the not-configured unavailable message (Req 5.3), the "save did not
+          complete" text (Req 7.7), and the flag "action not recorded" text (Req 6.6). */}
+      <div aria-live="polite" role="status">
+        {unavailable && <div className="banner">{unavailable}</div>}
+        {saveError && <div className="banner error">{saveError}</div>}
+        {flagError && <div className="banner error">{flagError}</div>}
+      </div>
 
       {report.status === 'needs_review' && (
         <div className="banner">
@@ -208,7 +288,7 @@ export function Report({
       </DisclosureSection>
 
       <DisclosureSection title="Framing Signals" count={counts.framingSignals}>
-        <Framing report={report} onFlag={onFlag} />
+        <Framing report={report} onFlag={onFlag} flagBusy={flagBusy} />
       </DisclosureSection>
 
       <DisclosureSection title="Useful Context" count={counts.contextCards}>
@@ -401,7 +481,17 @@ function ClaimCard({ claim, num }: { claim: Claim; num: number }) {
   );
 }
 
-function Framing({ report, onFlag }: { report: AnalysisReport; onFlag: (technique: string) => void }) {
+function Framing({
+  report,
+  onFlag,
+  flagBusy,
+}: {
+  report: AnalysisReport;
+  onFlag: (technique: string) => void;
+  // The technique whose flag request is in flight, so its control is disabled until
+  // the request completes (Req 6.5); null when no flag is pending.
+  flagBusy: string | null;
+}) {
   const [active, setActive] = useState(0);
   if (report.framingSignals.length === 0) return <Empty msg="No framing signals detected." />;
   const selected = report.framingSignals[active];
@@ -435,12 +525,14 @@ function Framing({ report, onFlag }: { report: AnalysisReport; onFlag: (techniqu
               <button
                 type="button"
                 className="flag-btn"
+                disabled={flagBusy === sig.technique}
+                aria-busy={flagBusy === sig.technique}
                 onClick={(e) => {
                   e.stopPropagation(); // don't also toggle the active signal
-                  onFlag(sig.technique);
+                  void onFlag(sig.technique);
                 }}
               >
-                <Flag size={12} /> Flag this technique
+                <Flag size={12} /> {flagBusy === sig.technique ? 'Flagging…' : 'Flag this technique'}
               </button>
             </div>
           </div>
