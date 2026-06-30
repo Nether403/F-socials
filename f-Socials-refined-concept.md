@@ -187,6 +187,8 @@ URL/transcript
 
 Every score-bearing row carries a `producing_layer` and `version` so the UI can always show provenance.
 
+> **As-built (shipped).** The identity-keyed tables landed with a deliberate divergence tracked in `f-Socials-debt-and-todo.md`: saved reports and institutional workspaces key on the **Supabase JWT subject (`TEXT`)** rather than a local `users(id)` UUID (migrations `006`/`007`). The legacy `flags` FK to `users(id)` is kept and satisfied by **User_Sync** (migration `009` + `Repository.ensureLocalUser`), which syncs a local `users` row from the verified JWT claims before a flag is persisted. `expert_reviews`/`literacy_profile` remain as-specified targets.
+
 ---
 
 ## 10. UX & trust design

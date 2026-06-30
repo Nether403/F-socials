@@ -5,7 +5,7 @@
 > Compass: **f-Socials is a lens, not a judge.** Every decision below answers to that.
 > Scope: **paste link → inspect claims & framing → see credible alternatives → share report.** Nothing else ships in v1.
 >
-> **Status (build):** the Foundation engine in §2–§5 and §7 (steps 1–8) is **built and proven end-to-end** — real providers, durable infra, auth, rate limiting, the invariant gate, and a live report + share UI. Remaining v1 surfaces (methodology page, dispute/flag UI, expert review queue, accounts/save) are tracked in `f-Socials-debt-and-todo.md` and sequenced in `f-Socials-roadmap.md`.
+> **Status (build):** the Foundation engine in §2–§5 and §7 (steps 1–8) is **built and proven end-to-end** — real providers, durable infra, auth, rate limiting, the invariant gate, and a live report + share UI. The v1 surfaces once listed as remaining are now **all shipped**: the methodology page, dispute/flag intake, the expert review queue + Reviewer Console, accounts/save + reverse-chronological history, and the client-side auth flow. Slice 2 ("Pilots") work has also landed — institutional workspaces, EN/NL localization, the progressive-disclosure report UI, the intervention & scale capabilities (dark by default), and **Supabase user sync** (the flag `users(id)` FK seam, migration `009`). `f-Socials-debt-and-todo.md` is the live build-state truth; `f-Socials-roadmap.md` holds the sequencing.
 
 ---
 
@@ -215,6 +215,8 @@ CREATE TABLE saved_reports (
   PRIMARY KEY (user_id, report_id)
 );
 ```
+
+> **As-built note (persistence).** The DDL above is the canonical v1 target. As shipped, the identity-keyed tables diverge deliberately and are tracked in `f-Socials-debt-and-todo.md`: `saved_reports` shipped as **`reader_saved_reports`** keyed on the **Supabase JWT subject (`TEXT`)** rather than `user_id UUID` (migration `006`), and institutional workspaces added the `007` table set on the same subject convention. The legacy `flags.user_id UUID REFERENCES users(id)` FK above is kept as-is and satisfied by **User_Sync** (migration `009` + `Repository.ensureLocalUser`), which ensures a local `users` row keyed to the JWT subject exists before a flag is persisted. Disputes remain anonymous (`raised_by` NULL).
 
 **Invariant enforced before `status = 'ready'`:** every `claims` row has ≥1 `citations` row; every `framing_signals` entry has a non-empty `evidence_span` and `source_url`. Violations → `status = 'needs_review'`.
 
