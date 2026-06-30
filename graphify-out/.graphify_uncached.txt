@@ -1,0 +1,76 @@
+H:\f-Socials\.kiro\specs\accounts-save-history\design.md
+H:\f-Socials\.kiro\specs\accounts-save-history\requirements.md
+H:\f-Socials\.kiro\specs\accounts-save-history\tasks.md
+H:\f-Socials\.kiro\specs\claim-verification-router\design.md
+H:\f-Socials\.kiro\specs\claim-verification-router\requirements.md
+H:\f-Socials\.kiro\specs\claim-verification-router\tasks.md
+H:\f-Socials\.kiro\specs\en-nl-localization\design.md
+H:\f-Socials\.kiro\specs\en-nl-localization\requirements.md
+H:\f-Socials\.kiro\specs\en-nl-localization\tasks.md
+H:\f-Socials\.kiro\specs\expert-review-queue\design.md
+H:\f-Socials\.kiro\specs\expert-review-queue\requirements.md
+H:\f-Socials\.kiro\specs\expert-review-queue\tasks.md
+H:\f-Socials\.kiro\specs\institutional-workspace\design.md
+H:\f-Socials\.kiro\specs\institutional-workspace\requirements.md
+H:\f-Socials\.kiro\specs\institutional-workspace\tasks.md
+H:\f-Socials\.kiro\specs\intervention-and-scale\design.md
+H:\f-Socials\.kiro\specs\intervention-and-scale\requirements.md
+H:\f-Socials\.kiro\specs\intervention-and-scale\tasks.md
+H:\f-Socials\.kiro\specs\observability-instrumentation\design.md
+H:\f-Socials\.kiro\specs\observability-instrumentation\requirements.md
+H:\f-Socials\.kiro\specs\observability-instrumentation\tasks.md
+H:\f-Socials\.kiro\specs\parallel-evidence-lookups\design.md
+H:\f-Socials\.kiro\specs\parallel-evidence-lookups\requirements.md
+H:\f-Socials\.kiro\specs\parallel-evidence-lookups\tasks.md
+H:\f-Socials\.kiro\specs\progressive-disclosure-report-ui\design.md
+H:\f-Socials\.kiro\specs\progressive-disclosure-report-ui\requirements.md
+H:\f-Socials\.kiro\specs\progressive-disclosure-report-ui\tasks.md
+H:\f-Socials\.kiro\specs\report-graph-normalization\design.md
+H:\f-Socials\.kiro\specs\report-graph-normalization\requirements.md
+H:\f-Socials\.kiro\specs\report-graph-normalization\tasks.md
+H:\f-Socials\.kiro\specs\supabase-user-sync\design.md
+H:\f-Socials\.kiro\specs\supabase-user-sync\requirements.md
+H:\f-Socials\.kiro\specs\supabase-user-sync\tasks.md
+H:\f-Socials\.kiro\specs\trust-and-launch-bundle\design.md
+H:\f-Socials\.kiro\specs\trust-and-launch-bundle\requirements.md
+H:\f-Socials\.kiro\specs\trust-and-launch-bundle\tasks.md
+H:\f-Socials\.kiro\steering\f-socials.md
+H:\f-Socials\Dataset related\Dataset collection research.md
+H:\f-Socials\Dataset related\Fact-Checking Dataset Acquisition Strategies.md
+H:\f-Socials\Design concepts\README.md
+H:\f-Socials\Design concepts\design_system\developer_handoff.md
+H:\f-Socials\Design concepts\design_system\documentation.md
+H:\f-Socials\Design concepts\design_system\figma_structure.md
+H:\f-Socials\Design concepts\features\feature_mapping.md
+H:\f-Socials\Design concepts\mockup designs\f-socials-uiux-design-direction\index.html
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\README.md
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\index.html
+H:\f-Socials\Design concepts\mockup designs\fsocialsuiux\f_socials_ux_design.html
+H:\f-Socials\Design concepts\presentation\stakeholder_deck.md
+H:\f-Socials\Design concepts\ux\guidelines.md
+H:\f-Socials\Design concepts\ux\target_audience.md
+H:\f-Socials\Feedback-roadmap options- directional strategy\Architectural & Code Structure Recommendations.md
+H:\f-Socials\Feedback-roadmap options- directional strategy\F-socials review and suggestions.md
+H:\f-Socials\Feedback-roadmap options- directional strategy\f-Socials feedback.md
+H:\f-Socials\LMM Fact Check query tuning.md
+H:\f-Socials\README.md
+H:\f-Socials\Strategic Licensing\Strategic Licensing Analysis for the f-Socials Media Literacy Pipeline.md
+H:\f-Socials\app\README.md
+H:\f-Socials\app\apps\server\loadresult.txt
+H:\f-Socials\app\apps\web\index.html
+H:\f-Socials\docs\README.md
+H:\f-Socials\docs\faq.md
+H:\f-Socials\docs\for-educators.md
+H:\f-Socials\docs\reviewer-guide.md
+H:\f-Socials\docs\user-guide.md
+H:\f-Socials\f-Socials-debt-and-todo.md
+H:\f-Socials\f-Socials-refined-concept.md
+H:\f-Socials\f-Socials-resources-shopping-list.md
+H:\f-Socials\f-Socials-roadmap.md
+H:\f-Socials\f-Socials-v1-product-definition.md
+H:\f-Socials\Design concepts\conceptui.png
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\public\favicon.svg
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\public\icons.svg
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\src\assets\hero.png
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\src\assets\react.svg
+H:\f-Socials\Design concepts\mockup designs\frontendconcept\src\assets\vite.svg
