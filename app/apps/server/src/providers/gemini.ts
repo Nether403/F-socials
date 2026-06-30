@@ -16,26 +16,37 @@ export interface GeminiOpts {
   timeoutMs?: number;
 }
 
-async function callModelJson(
+// Low-level single-model call returning the raw response text. When `schema` is
+// provided the model is asked for strict JSON (responseMimeType + responseSchema);
+// omit it for free-text generation. `system` is sent as a systemInstruction only
+// when non-empty. This is the shared HTTP core both the JSON and text helpers build on.
+async function callModelText(
   model: string,
   apiKey: string,
   timeoutMs: number,
   system: string,
   userText: string,
-  schema: unknown,
-): Promise<any> {
+  schema?: unknown,
+): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const generationConfig: Record<string, unknown> = { temperature: 0.2 };
+  if (schema !== undefined) {
+    generationConfig.responseMimeType = 'application/json';
+    generationConfig.responseSchema = schema;
+  }
+  const body: Record<string, unknown> = {
+    contents: [{ role: 'user', parts: [{ text: userText }] }],
+    generationConfig,
+  };
+  if (system) body.systemInstruction = { parts: [{ text: system }] };
+
   let res: Response;
   try {
     res = await fetch(endpoint(model), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: 'user', parts: [{ text: userText }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema },
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (err) {
@@ -52,22 +63,19 @@ async function callModelJson(
   const data = (await res.json()) as any;
   const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error(`no content (finishReason=${data?.candidates?.[0]?.finishReason ?? 'no_text'})`);
-  return JSON.parse(text);
+  return text;
 }
 
-// Generic JSON completion with primary -> backup model fallback.
-export async function callGeminiJson(
-  opts: GeminiOpts,
-  args: { system: string; userText: string; schema: unknown },
-): Promise<any> {
-  const timeoutMs = opts.timeoutMs ?? 30000;
+// Primary -> backup model fallback shared by the JSON and text helpers: try the
+// primary model, then (if configured) the backup, with the same warn/log lines.
+async function callWithBackup<T>(opts: GeminiOpts, run: (model: string) => Promise<T>): Promise<T> {
   try {
-    return await callModelJson(opts.model, opts.apiKey, timeoutMs, args.system, args.userText, args.schema);
+    return await run(opts.model);
   } catch (primaryErr) {
     if (!opts.backupModel) throw new Error(`Gemini ${opts.model} failed: ${msg(primaryErr)}`);
     console.warn(`[gemini] primary "${opts.model}" failed (${msg(primaryErr)}); trying backup "${opts.backupModel}"`);
     try {
-      const r = await callModelJson(opts.backupModel, opts.apiKey, timeoutMs, args.system, args.userText, args.schema);
+      const r = await run(opts.backupModel);
       console.log(`[gemini] backup "${opts.backupModel}" served the request`);
       return r;
     } catch (backupErr) {
@@ -76,6 +84,26 @@ export async function callGeminiJson(
       );
     }
   }
+}
+
+// Generic JSON completion with primary -> backup model fallback.
+export async function callGeminiJson(
+  opts: GeminiOpts,
+  args: { system: string; userText: string; schema: unknown },
+): Promise<any> {
+  const timeoutMs = opts.timeoutMs ?? 30000;
+  const text = await callWithBackup(opts, (model) =>
+    callModelText(model, opts.apiKey, timeoutMs, args.system, args.userText, args.schema),
+  );
+  return JSON.parse(text);
+}
+
+// Generic free-text completion with primary -> backup model fallback. Returns the
+// model's raw text response; the caller parses it. Used by the coaching LLM seam,
+// whose engine asks for (and itself parses) a JSON array out of free text.
+export async function callGeminiText(opts: GeminiOpts, prompt: string): Promise<string> {
+  const timeoutMs = opts.timeoutMs ?? 30000;
+  return callWithBackup(opts, (model) => callModelText(model, opts.apiKey, timeoutMs, '', prompt));
 }
 
 const EXTRACTION_SYSTEM = `You are f-Socials, a media-literacy analysis engine.

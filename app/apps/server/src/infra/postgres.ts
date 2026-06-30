@@ -2,27 +2,38 @@
 // analysis_reports.data — lossless round-trip, minimal SQL. Keyed columns
 // (status, share_slug, content_id) stay populated for indexing/future queries.
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 
 import { Pool } from 'pg';
 import type {
   AnalysisReport,
   AuditRecord,
+  CitationRow,
+  ClaimRow,
   ContentItem,
+  EvidenceOutcome,
+  PerspectiveRow,
   ReviewActionResult,
   ReviewItem,
   ReviewKind,
   ReviewLifecycle,
   ReviewResolutionInput,
 } from '../types';
+import type { HumanSignal } from '../core/kpi';
 import { projectReportGraph } from '../core/reportGraph';
 import type {
   Annotation,
+  ClaimFilter,
   CollectionItemEntry,
+  DomainAggregate,
   Membership,
+  RateLimitConfig,
+  RateLimitResult,
   Repository,
   SavedReportEntry,
   SharedCollection,
+  TopicAggregate,
+  TrustGateConfigRow,
   WorkspaceRole,
   WorkspaceSummary,
 } from './ports';
@@ -669,5 +680,356 @@ export class PostgresRepository implements Repository {
   async deleteAnnotation(annotationId: string): Promise<void> {
     // Caller has enforced authorization (Req 7.5).
     await this.pool.query(`DELETE FROM annotations WHERE id = $1`, [annotationId]);
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Institutional API keys (intervention-and-scale). Parameterized SQL only;
+  // plaintext never persisted — only the SHA-256 hash (Req 6.8, 14.5). DB errors
+  // propagate to the caller with no partial write (Req 14.8).
+
+  async createApiKey(institutionId: string): Promise<{ keyId: string; plaintext: string }> {
+    // Enforce <=10 active keys per institution (Req 6.7).
+    const countRes = await this.pool.query(
+      `SELECT COUNT(*) AS cnt FROM api_keys WHERE institution_id = $1 AND revoked_at IS NULL`,
+      [institutionId],
+    );
+    if (Number(countRes.rows[0].cnt) >= 10) {
+      throw new Error('ActiveKeyLimit');
+    }
+    const keyId = randomUUID();
+    const plaintext = randomBytes(32).toString('base64url');
+    const keyHash = createHash('sha256').update(plaintext).digest('hex');
+    await this.pool.query(
+      `INSERT INTO api_keys (id, institution_id, key_hash) VALUES ($1, $2, $3)`,
+      [keyId, institutionId, keyHash],
+    );
+    return { keyId, plaintext };
+  }
+
+  async findApiKeyByHash(hash: string): Promise<{ keyId: string; institutionId: string; rateLimit?: RateLimitConfig } | undefined> {
+    const r = await this.pool.query(
+      `SELECT id, institution_id, rate_max, rate_window_s
+         FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL`,
+      [hash],
+    );
+    const row = r.rows[0];
+    if (!row) return undefined;
+    const result: { keyId: string; institutionId: string; rateLimit?: RateLimitConfig } = {
+      keyId: row.id,
+      institutionId: row.institution_id,
+    };
+    if (row.rate_max != null && row.rate_window_s != null) {
+      result.rateLimit = { maxRequests: row.rate_max, windowSeconds: row.rate_window_s };
+    }
+    return result;
+  }
+
+  async revokeApiKey(keyId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE api_keys SET revoked_at = NOW() WHERE id = $1`,
+      [keyId],
+    );
+  }
+
+  async countActiveApiKeys(institutionId: string): Promise<number> {
+    const r = await this.pool.query(
+      `SELECT COUNT(*) AS cnt FROM api_keys WHERE institution_id = $1 AND revoked_at IS NULL`,
+      [institutionId],
+    );
+    return Number(r.rows[0].cnt);
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Per-key institutional rate limiting (intervention-and-scale). Fixed-window
+  // counter using the `api_key_rate_windows` table (Req 8.2, 8.4, 8.6).
+
+  async institutionalHit(keyId: string, cfg: RateLimitConfig): Promise<RateLimitResult> {
+    const now = new Date();
+    const windowMs = cfg.windowSeconds * 1000;
+
+    // Read existing window; if absent or expired, create a new one.
+    const existing = await this.pool.query(
+      `SELECT window_start, count FROM api_key_rate_windows WHERE key_id = $1`,
+      [keyId],
+    );
+
+    let windowStart: Date;
+    let count: number;
+
+    if (existing.rows[0]) {
+      windowStart = new Date(existing.rows[0].window_start);
+      const elapsed = now.getTime() - windowStart.getTime();
+      if (elapsed >= windowMs) {
+        // Window expired — reset (Req 8.6).
+        windowStart = now;
+        count = 1;
+        await this.pool.query(
+          `UPDATE api_key_rate_windows SET window_start = $1, count = 1 WHERE key_id = $2`,
+          [windowStart.toISOString(), keyId],
+        );
+      } else {
+        // Increment current window.
+        count = existing.rows[0].count + 1;
+        await this.pool.query(
+          `UPDATE api_key_rate_windows SET count = $1 WHERE key_id = $2`,
+          [count, keyId],
+        );
+      }
+    } else {
+      // First hit for this key — create window.
+      windowStart = now;
+      count = 1;
+      await this.pool.query(
+        `INSERT INTO api_key_rate_windows (key_id, window_start, count)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (key_id) DO UPDATE SET window_start = EXCLUDED.window_start, count = 1`,
+        [keyId, windowStart.toISOString()],
+      );
+    }
+
+    const resetSeconds = Math.ceil((windowStart.getTime() + windowMs - now.getTime()) / 1000);
+    return {
+      allowed: count <= cfg.maxRequests,
+      remaining: Math.max(0, cfg.maxRequests - count),
+      limit: cfg.maxRequests,
+      resetSeconds,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Trust-gate config (intervention-and-scale). Optional runtime override for a
+  // capability; env is the floor/source of truth (Req 12.2, 12.4).
+
+  async getTrustGateConfig(capability: string): Promise<TrustGateConfigRow | undefined> {
+    const r = await this.pool.query(
+      `SELECT capability, coverage_min, agreement_min, legal_review_ok, updated_at
+         FROM trust_gate_config WHERE capability = $1`,
+      [capability],
+    );
+    const row = r.rows[0];
+    if (!row) return undefined;
+    return {
+      capability: row.capability,
+      coverageMin: Number(row.coverage_min),
+      agreementMin: Number(row.agreement_min),
+      legalReviewOk: row.legal_review_ok,
+      updatedAt: new Date(row.updated_at).toISOString(),
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Read-only metric aggregates (intervention-and-scale). Enumerate already-
+  // persisted audit/signal data for KPI re-computation (Req 1.6, 1.8, 14.6).
+
+  async listEvidenceOutcomes(): Promise<Array<{ reportId: string; claimId: string; evidenceOutcome: EvidenceOutcome }>> {
+    const r = await this.pool.query(
+      `SELECT report_id, claim_id, data FROM audit_records`,
+    );
+    return r.rows.map((row) => {
+      const data = row.data as AuditRecord;
+      return {
+        reportId: row.report_id as string,
+        claimId: row.claim_id as string,
+        evidenceOutcome: data.evidenceOutcome,
+      };
+    });
+  }
+
+  async listHumanSignals(): Promise<HumanSignal[]> {
+    // Disputes and flags, id-only (no submitter identity — Req 8.7).
+    const disputes = await this.pool.query(
+      `SELECT report_id, claim_id FROM disputes`,
+    );
+    const flags = await this.pool.query(
+      `SELECT report_id, claim_id FROM flags`,
+    );
+    const signals: HumanSignal[] = [];
+    for (const row of disputes.rows) {
+      if (row.claim_id) {
+        signals.push({ kind: 'dispute', reportId: row.report_id, claimId: row.claim_id });
+      }
+    }
+    for (const row of flags.rows) {
+      if (row.claim_id) {
+        signals.push({ kind: 'flag', reportId: row.report_id, claimId: row.claim_id });
+      }
+    }
+    return signals;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Read-only Report_Graph queries (intervention-and-scale). SELECT-only against
+  // claims/citations/perspective_links (Req 9.1, 9.2). Parameterized SQL only
+  // (Req 14.5). Empty matches → empty result, no error (Req 9.3).
+
+  async queryClaims(filter: ClaimFilter): Promise<{ items: ClaimRow[]; totalCount: number }> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+
+    if (filter.reportId) {
+      conditions.push(`c.report_id = $${idx++}`);
+      params.push(filter.reportId);
+    }
+    if (filter.keyword) {
+      conditions.push(`c.claim_text ILIKE $${idx++}`);
+      params.push(`%${filter.keyword}%`);
+    }
+    if (filter.fromDate) {
+      conditions.push(`ar.created_at >= $${idx++}`);
+      params.push(filter.fromDate);
+    }
+    if (filter.toDate) {
+      conditions.push(`ar.created_at <= $${idx++}`);
+      params.push(filter.toDate);
+    }
+    if (filter.topic) {
+      conditions.push(`EXISTS (SELECT 1 FROM perspective_links pl WHERE pl.report_id = c.report_id AND pl.issue_frame_label = $${idx++})`);
+      params.push(filter.topic);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const needsJoin = filter.fromDate || filter.toDate;
+    const fromClause = needsJoin
+      ? `FROM claims c JOIN analysis_reports ar ON ar.id = c.report_id`
+      : `FROM claims c`;
+
+    // Count total matching rows.
+    const countSql = `SELECT COUNT(*) AS cnt ${fromClause} ${where}`;
+    const countRes = await this.pool.query(countSql, params);
+    const totalCount = Number(countRes.rows[0].cnt);
+
+    // Paginate.
+    const page = Math.max(0, filter.page ?? 0);
+    const pageSize = Math.min(200, Math.max(1, filter.pageSize ?? 50));
+    const offset = page * pageSize;
+
+    // ORDER BY report_id ASC, ordinal ASC — matches the in-memory driver exactly
+    // (ordinals are unique within a report, so this is a total, deterministic order).
+    const dataSql = `SELECT c.claim_uid, c.report_id, c.claim_text, c.transcript_span,
+                            c.verifiability, c.evidence_strength, c.source_basis,
+                            c.confidence, c.ordinal
+                     ${fromClause} ${where}
+                     ORDER BY c.report_id ASC, c.ordinal ASC
+                     LIMIT $${idx++} OFFSET $${idx++}`;
+    params.push(pageSize, offset);
+
+    const dataRes = await this.pool.query(dataSql, params);
+    const items: ClaimRow[] = dataRes.rows.map((row) => ({
+      claimUid: row.claim_uid,
+      reportId: row.report_id,
+      claimText: row.claim_text,
+      transcriptSpan: row.transcript_span ?? undefined,
+      verifiability: row.verifiability,
+      evidenceStrength: row.evidence_strength,
+      sourceBasis: row.source_basis ?? undefined,
+      confidence: Number(row.confidence),
+      ordinal: Number(row.ordinal),
+    }));
+
+    return { items, totalCount };
+  }
+
+  async listCitationsForClaim(claimUid: string): Promise<CitationRow[]> {
+    // Deterministic content order matching the in-memory driver (Req 14.2): the
+    // citation id is a random UUID (no insertion-order column), so order by the
+    // stable content key. ponytail: free-text ORDER BY is subject to DB collation;
+    // the parity test keys on this same (sourceUrl, sourceName, excerpt) tuple.
+    const r = await this.pool.query(
+      `SELECT ci.source_url, ci.source_name, ci.source_tier, ci.excerpt, ci.supports, c.claim_uid
+         FROM citations ci
+         JOIN claims c ON c.id = ci.claim_id
+        WHERE c.claim_uid = $1
+        ORDER BY ci.source_url ASC, COALESCE(ci.source_name, '') ASC, COALESCE(ci.excerpt, '') ASC`,
+      [claimUid],
+    );
+    return r.rows.map((row) => ({
+      claimUid: row.claim_uid,
+      sourceUrl: row.source_url,
+      sourceName: row.source_name,
+      sourceTier: row.source_tier,
+      excerpt: row.excerpt ?? undefined,
+      supports: row.supports,
+    }));
+  }
+
+  async listPerspectivesForReport(reportId: string): Promise<PerspectiveRow[]> {
+    // Deterministic content order matching the in-memory driver (Req 14.2); the id
+    // is a random UUID, so order by the stable (url, issue_frame_label) key.
+    const r = await this.pool.query(
+      `SELECT report_id, url, source_name, source_tier, issue_frame_label,
+              divergence_score, dehumanization_score
+         FROM perspective_links WHERE report_id = $1
+        ORDER BY url ASC, COALESCE(issue_frame_label, '') ASC`,
+      [reportId],
+    );
+    return r.rows.map((row) => ({
+      reportId: row.report_id,
+      url: row.url,
+      sourceName: row.source_name,
+      sourceTier: row.source_tier,
+      issueFrameLabel: row.issue_frame_label,
+      divergence: Number(row.divergence_score),
+      dehumanization: Number(row.dehumanization_score),
+    }));
+  }
+
+  async aggregateByDomain(): Promise<DomainAggregate[]> {
+    // Group citations by the domain of source_url, count distinct reports and
+    // claims, and compute the mean ratio of claims-with-citations to total claims
+    // per report within each domain group (Req 9.4).
+    const r = await this.pool.query(
+      `WITH domain_citations AS (
+         SELECT
+           COALESCE(
+             substring(ci.source_url from '://([^/]+)'),
+             ci.source_url
+           ) AS domain,
+           c.report_id,
+           c.claim_uid
+         FROM citations ci
+         JOIN claims c ON c.id = ci.claim_id
+       ),
+       per_report AS (
+         SELECT
+           dc.domain,
+           dc.report_id,
+           COUNT(DISTINCT dc.claim_uid) AS cited_claims,
+           total.total_claims
+         FROM domain_citations dc
+         JOIN (
+           SELECT report_id, COUNT(*) AS total_claims FROM claims GROUP BY report_id
+         ) total ON total.report_id = dc.report_id
+         GROUP BY dc.domain, dc.report_id, total.total_claims
+       )
+       SELECT
+         domain,
+         COUNT(DISTINCT report_id)::int AS report_count,
+         SUM(cited_claims)::int AS claim_count,
+         AVG(cited_claims::float / GREATEST(total_claims, 1)) AS mean_cited_claim_ratio
+       FROM per_report
+       GROUP BY domain
+       ORDER BY domain ASC`,
+    );
+    return r.rows.map((row) => ({
+      domain: row.domain,
+      reportCount: Number(row.report_count),
+      claimCount: Number(row.claim_count),
+      meanCitedClaimRatio: Number(row.mean_cited_claim_ratio),
+    }));
+  }
+
+  async aggregateByTopic(): Promise<TopicAggregate[]> {
+    // Group reports by issue_frame_label from perspective_links (Req 9.4).
+    const r = await this.pool.query(
+      `SELECT issue_frame_label, COUNT(DISTINCT report_id)::int AS report_count
+         FROM perspective_links
+        GROUP BY issue_frame_label
+        ORDER BY issue_frame_label ASC`,
+    );
+    return r.rows.map((row) => ({
+      issueFrameLabel: row.issue_frame_label,
+      reportCount: Number(row.report_count),
+    }));
   }
 }

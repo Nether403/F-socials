@@ -1,10 +1,11 @@
 // Feature: progressive-disclosure-report-ui, Property 11: Tier chips attach only to sources, never to the creator
 // Validates: Requirements 6.3, 8.4
 import { describe, it, expect } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { fireEvent, cleanup } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
 import { TIER } from './reportView';
+import { renderWithLang } from '../test/renderWithLang';
 import type { AnalysisReport, Citation, PerspectiveLink, SourceTier } from '../api/types';
 
 // The four human-readable tier labels are the only strings that count as a rendered tier chip.
@@ -86,7 +87,7 @@ describe('Property 11: Tier chips attach only to sources, never to the creator',
           shape.claims.reduce((n, tiers) => n + tiers.filter(isValidTier).length, 0) +
           shape.perspectiveTiers.filter(isValidTier).length;
 
-        const { container } = render(<Report report={buildReport(shape)} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={buildReport(shape)} onBack={() => {}} />);
         try {
           // Citations live behind the collapsed Claim Ledger drawer AND each claim's own drawer;
           // perspectives live behind the collapsed Other Angles drawer. Expand them all so every

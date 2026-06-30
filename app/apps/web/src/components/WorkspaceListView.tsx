@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { createWorkspace, listWorkspaces, redeemInvite } from '../api/client';
 import type { WorkspaceRole, WorkspaceSummary } from '../api/types';
+import { useT } from '../i18n/context';
 
 // Workspace_View list surface (#/workspaces) — lists the reader's Workspaces and
 // offers a create-workspace form and a redeem-invite form.
@@ -60,6 +61,7 @@ function sortByName(entries: WorkspaceSummary[]): WorkspaceSummary[] {
 }
 
 function roleLabel(role: WorkspaceRole): string {
+  // ponytail: kept as fallback for non-component contexts; localized version uses t() inside components
   return role === 'owner' ? 'Owner' : 'Member';
 }
 
@@ -99,6 +101,7 @@ export function WorkspaceListView({
   onBack,
   onAuthError,
 }: WorkspaceListViewProps) {
+  const { t } = useT();
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   // Single polite live region content: load/create/redeem outcomes are announced
   // without requiring a focus change (Req 14.8).
@@ -115,15 +118,15 @@ export function WorkspaceListView({
       return;
     }
     setPhase({ kind: 'loading' });
-    setStatus('Loading your workspaces…');
+    setStatus(t('workspaces.loading'));
     try {
       const entries = await withTimeout(listWorkspaces(token), WORKSPACE_TIMEOUT_MS);
       const sorted = sortByName(entries);
       setPhase({ kind: 'ready', entries: sorted });
       setStatus(
         sorted.length === 0
-          ? 'You are not a member of any workspace yet.'
-          : `Loaded ${sorted.length} workspace${sorted.length === 1 ? '' : 's'}.`,
+          ? t('workspaces.emptyStatus')
+          : t('workspaces.loaded', { n: String(sorted.length), s: sorted.length === 1 ? '' : 's' }),
       );
     } catch (e) {
       onAuthError?.(e);
@@ -147,14 +150,14 @@ export function WorkspaceListView({
       return { kind: 'ready', entries: sortByName([...existing, ws]) };
     });
     setSelectedId(ws.id);
-    setStatus(`Workspace "${ws.name}" created. You are listed as ${roleLabel(ws.role)}.`);
+    setStatus(t('workspaces.create.success', { name: ws.name, role: t(`workspaces.role.${ws.role}`) }));
   }
 
   // Redeem-confirmation: the redeem response carries only the workspace id + role, so
   // reload the list to pick up the joined workspace's name, then select it.
   async function handleJoined(workspaceId: string) {
     setSelectedId(workspaceId);
-    setStatus('Invite redeemed. You joined the workspace.');
+    setStatus(t('workspaces.redeem.success'));
     await load();
   }
 
@@ -173,7 +176,7 @@ export function WorkspaceListView({
             onClick={back}
             style={{ height: 34, padding: '0 12px' }}
           >
-            <ArrowLeft size={15} aria-hidden="true" /> Back
+            <ArrowLeft size={15} aria-hidden="true" /> {t('workspaces.back')}
           </button>
           <h2 className="editorial">
             <Users
@@ -181,10 +184,10 @@ export function WorkspaceListView({
               aria-hidden="true"
               style={{ color: ACCENT, verticalAlign: '-3px', marginRight: 6 }}
             />
-            Workspaces
+            {t('workspaces.heading')}
           </h2>
           <div className="meta-row">
-            <span>Shared spaces where your group collects and discusses analyzed reports.</span>
+            <span>{t('workspaces.subtitle')}</span>
           </div>
         </div>
         {isAuthConfigured && (
@@ -195,9 +198,9 @@ export function WorkspaceListView({
               style={{ height: 38, padding: '0 14px', flexShrink: 0 }}
               onClick={() => void load()}
               disabled={phase.kind === 'loading'}
-              aria-label="Refresh your workspaces"
+              aria-label={t('workspaces.refreshLabel')}
             >
-              <RefreshCw size={15} aria-hidden="true" /> Refresh
+              <RefreshCw size={15} aria-hidden="true" /> {t('workspaces.refresh')}
             </button>
           </div>
         )}
@@ -218,8 +221,7 @@ export function WorkspaceListView({
         >
           <Lock size={20} aria-hidden="true" style={{ marginBottom: 6 }} />
           <p style={{ margin: 0 }}>
-            Workspace features are unavailable. Sign-in is not configured in this deployment,
-            so shared workspaces cannot be created or joined here.
+            {t('workspaces.unavailable')}
           </p>
         </div>
       )}
@@ -234,7 +236,7 @@ export function WorkspaceListView({
           {phase.kind === 'loading' && (
             <div className="loading" role="status" aria-live="polite">
               <div className="spinner" />
-              <div className="section-label">Loading your workspaces…</div>
+              <div className="section-label">{t('workspaces.loading')}</div>
             </div>
           )}
 
@@ -245,10 +247,10 @@ export function WorkspaceListView({
               </div>
               <div className="error-actions">
                 <button type="button" className="btn" onClick={() => void load()}>
-                  <RefreshCw size={15} aria-hidden="true" /> Retry
+                  <RefreshCw size={15} aria-hidden="true" /> {t('workspaces.retry')}
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={back}>
-                  Back
+                  {t('workspaces.back')}
                 </button>
               </div>
             </div>
@@ -264,14 +266,13 @@ export function WorkspaceListView({
             >
               <Inbox size={20} aria-hidden="true" style={{ marginBottom: 6 }} />
               <p style={{ margin: 0 }}>
-                You are not a member of any workspace yet. Create one above to start collecting
-                and discussing reports with your group.
+                {t('workspaces.empty')}
               </p>
             </div>
           )}
 
           {phase.kind === 'ready' && phase.entries.length > 0 && (
-            <ul className="history-list" aria-label="Your workspaces">
+            <ul className="history-list" aria-label={t('workspaces.heading')}>
               {phase.entries.map((ws) => (
                 <WorkspaceRow
                   key={ws.id}
@@ -300,6 +301,7 @@ function WorkspaceRow({
   selected: boolean;
   onOpenWorkspace: (workspaceId: string) => void;
 }) {
+  const { t } = useT();
   return (
     <li
       className="mini-card history-entry"
@@ -310,7 +312,7 @@ function WorkspaceRow({
           type="button"
           className="history-open"
           onClick={() => onOpenWorkspace(workspace.id)}
-          aria-label={`Open workspace ${workspace.name}`}
+          aria-label={t('workspaces.openLabel', { name: workspace.name })}
           aria-current={selected ? 'true' : undefined}
         >
           <Users size={15} aria-hidden="true" />
@@ -323,8 +325,8 @@ function WorkspaceRow({
             <User size={13} aria-hidden="true" />
           )}
           {/* Role text always present beside the icon (Req 14.2). */}
-          <span>Your role: {roleLabel(workspace.role)}</span>
-          {selected && <span style={{ color: ACCENT }}>· Selected</span>}
+          <span>{t('workspaces.roleLabel', { role: t(`workspaces.role.${workspace.role}`) })}</span>
+          {selected && <span style={{ color: ACCENT }}>· {t('workspaces.selected')}</span>}
         </div>
       </div>
     </li>
@@ -342,6 +344,7 @@ function CreateWorkspaceForm({
   onCreated: (ws: WorkspaceSummary) => void;
   onAuthError?: (error: unknown) => void;
 }) {
+  const { t } = useT();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -369,9 +372,9 @@ function CreateWorkspaceForm({
   }
 
   return (
-    <form className="mini-card" onSubmit={submit} aria-label="Create a workspace">
+    <form className="mini-card" onSubmit={submit} aria-label={t('workspaces.create.heading')}>
       <h4 style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <FolderPlus size={15} aria-hidden="true" style={{ color: ACCENT }} /> Create a workspace
+        <FolderPlus size={15} aria-hidden="true" style={{ color: ACCENT }} /> {t('workspaces.create.heading')}
       </h4>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
         <input
@@ -380,8 +383,8 @@ function CreateWorkspaceForm({
           type="text"
           value={name}
           maxLength={100}
-          placeholder="Workspace name"
-          aria-label="New workspace name"
+          placeholder={t('workspaces.create.placeholder')}
+          aria-label={t('workspaces.create.nameLabel')}
           onChange={(ev) => setName(ev.target.value)}
           disabled={busy}
         />
@@ -390,9 +393,9 @@ function CreateWorkspaceForm({
           className="btn"
           style={{ height: 38, padding: '0 14px' }}
           disabled={busy || !valid}
-          aria-label="Create workspace"
+          aria-label={t('workspaces.create.submitLabel')}
         >
-          <Plus size={15} aria-hidden="true" /> {busy ? 'Creating…' : 'Create'}
+          <Plus size={15} aria-hidden="true" /> {busy ? t('workspaces.create.creating') : t('workspaces.create.submit')}
         </button>
       </div>
       {error && (
@@ -414,6 +417,7 @@ function RedeemInviteForm({
   onJoined: (workspaceId: string) => void | Promise<void>;
   onAuthError?: (error: unknown) => void;
 }) {
+  const { t } = useT();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -441,9 +445,9 @@ function RedeemInviteForm({
   }
 
   return (
-    <form className="mini-card" onSubmit={submit} aria-label="Redeem an invite">
+    <form className="mini-card" onSubmit={submit} aria-label={t('workspaces.redeem.heading')}>
       <h4 style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Ticket size={15} aria-hidden="true" style={{ color: ACCENT }} /> Join with an invite code
+        <Ticket size={15} aria-hidden="true" style={{ color: ACCENT }} /> {t('workspaces.redeem.heading')}
       </h4>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
         <input
@@ -452,8 +456,8 @@ function RedeemInviteForm({
           type="text"
           value={code}
           maxLength={200}
-          placeholder="Invite code"
-          aria-label="Invite code"
+          placeholder={t('workspaces.redeem.placeholder')}
+          aria-label={t('workspaces.redeem.codeLabel')}
           onChange={(ev) => setCode(ev.target.value)}
           disabled={busy}
         />
@@ -462,9 +466,9 @@ function RedeemInviteForm({
           className="btn btn-ghost"
           style={{ height: 38, padding: '0 14px' }}
           disabled={busy || !valid}
-          aria-label="Redeem invite"
+          aria-label={t('workspaces.redeem.submitLabel')}
         >
-          <Ticket size={15} aria-hidden="true" /> {busy ? 'Joining…' : 'Join'}
+          <Ticket size={15} aria-hidden="true" /> {busy ? t('workspaces.redeem.joining') : t('workspaces.redeem.submit')}
         </button>
       </div>
       {error && (

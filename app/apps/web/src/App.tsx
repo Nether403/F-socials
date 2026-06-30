@@ -11,6 +11,8 @@ import { HistoryView } from './components/HistoryView';
 import { WorkspaceListView } from './components/WorkspaceListView';
 import { WorkspaceDetailView } from './components/WorkspaceDetailView';
 import { useSession } from './auth/useSession';
+import { LanguageSelector } from './components/LanguageSelector';
+import { useT } from './i18n/context';
 
 type View =
   | { kind: 'home' }
@@ -28,7 +30,7 @@ type View =
 // throws while rendering, we show an unavailable banner instead of a blank app;
 // the reader's prior report view is retained in App state and restored via onBack.
 class MethodologyBoundary extends Component<
-  { onBack: () => void; children: ReactNode },
+  { onBack: () => void; t: (key: string) => string; children: ReactNode },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -43,10 +45,10 @@ class MethodologyBoundary extends Component<
       return (
         <div>
           <div className="banner error">
-            The methodology page is unavailable right now. Your report is still here.
+            {this.props.t('methodology.unavailable')}
           </div>
           <button className="btn btn-ghost" onClick={this.props.onBack}>
-            Back
+            {this.props.t('methodology.back')}
           </button>
         </div>
       );
@@ -55,25 +57,25 @@ class MethodologyBoundary extends Component<
   }
 }
 
-const EXAMPLES: { label: string; blurb: string; text: string }[] = [
+const EXAMPLES: { titleKey: string; blurbKey: string; text: string }[] = [
   {
-    label: 'Deep-sea mining monologue',
-    blurb: 'A persuasive clip arguing seabed mining is "impact-free".',
+    titleKey: 'home.example.deepsea.title',
+    blurbKey: 'home.example.deepsea.blurb',
     text: 'We stand at a critical crossroads. Climate change is ravaging our planet, and our only escape is a complete transition to green energy. The land-based mines in Congo are hotbeds of human rights violations. Harvesting these nodules is virtually impact-free. Mining companies are being held back by radical environmentalists who care more about deep-sea worms than the future of humanity. If we do not mine the seabed now, we doom ourselves to global warming.',
   },
   {
-    label: 'Conspiracy-laden rant',
-    blurb: 'Mixes well-known false claims with charged rhetoric.',
+    titleKey: 'home.example.conspiracy.title',
+    blurbKey: 'home.example.conspiracy.blurb',
     text: "Let me tell you the truth the mainstream media buries. COVID-19 vaccines contain a microchip that tracks the location of the patient. Climate change is a hoax invented by elites to control ordinary people. The moon landing in 1969 was staged in a Hollywood studio. Wake up before it is too late!",
   },
 ];
 
-const STEPS = [
-  'Acquiring transcript',
-  'Extracting claims & framing',
-  'Checking evidence',
-  'Finding other perspectives',
-  'Assembling report',
+const STEP_KEYS = [
+  'loading.step.transcript',
+  'loading.step.claims',
+  'loading.step.evidence',
+  'loading.step.perspectives',
+  'loading.step.assembling',
 ];
 
 export default function App() {
@@ -81,6 +83,7 @@ export default function App() {
   const [input, setInput] = useState('');
   const [view, setView] = useState<View>({ kind: 'home' });
   const [stepIdx, setStepIdx] = useState(0);
+  const { t } = useT();
   // The single session instance for the whole app (Req owns one useSession): it
   // restores a persisted session on load, tracks refresh/expiry, and on a 401
   // clears the session so the app falls back to the Anonymous experience (Req 4.4).
@@ -226,7 +229,7 @@ export default function App() {
     try {
       await session.signOut();
     } catch {
-      setNotice('You are signed out on this device, but the remote session may still be active.');
+      setNotice(t('header.signOutWarning'));
     }
     goHome();
   }
@@ -264,7 +267,7 @@ export default function App() {
       return;
     }
     stepTimer.current = window.setInterval(() => {
-      setStepIdx((i) => Math.min(i + 1, STEPS.length - 1));
+      setStepIdx((i) => Math.min(i + 1, STEP_KEYS.length - 1));
     }, 1600);
     return () => window.clearInterval(stepTimer.current);
   }, [view.kind]);
@@ -317,24 +320,25 @@ export default function App() {
           {session.session ? (
             <>
               <button className="btn btn-ghost" onClick={goWorkspaces}>
-                <Users size={15} aria-hidden="true" /> Workspaces
+                <Users size={15} aria-hidden="true" /> {t('header.workspaces')}
               </button>
               <button className="btn btn-ghost" onClick={goHistory}>
-                <Bookmark size={15} aria-hidden="true" /> Saved reports
+                <Bookmark size={15} aria-hidden="true" /> {t('header.savedReports')}
               </button>
               <button className="btn btn-ghost" onClick={() => void handleSignOut()}>
-                <LogOut size={15} aria-hidden="true" /> Sign out
+                <LogOut size={15} aria-hidden="true" /> {t('header.signOut')}
               </button>
             </>
           ) : (
             <button className="btn btn-ghost" onClick={goSignIn}>
-              <LogIn size={15} aria-hidden="true" /> Sign in
+              <LogIn size={15} aria-hidden="true" /> {t('header.signIn')}
             </button>
           )}
+          <LanguageSelector />
           <button
             className="icon-btn"
-            aria-label="Toggle theme"
-            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            aria-label={t('header.toggleTheme')}
+            onClick={() => setTheme((cur) => (cur === 'dark' ? 'light' : 'dark'))}
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -372,11 +376,11 @@ export default function App() {
             <div className="error-actions">
               {lastAttemptRef.current && (
                 <button className="btn" onClick={() => lastAttemptRef.current?.()}>
-                  Retry
+                  {t('error.retry')}
                 </button>
               )}
               <button className="btn btn-ghost" onClick={goHome}>
-                Back
+                {t('error.back')}
               </button>
             </div>
           </div>
@@ -393,7 +397,7 @@ export default function App() {
         )}
 
         {view.kind === 'methodology' && (
-          <MethodologyBoundary onBack={leaveMethodology}>
+          <MethodologyBoundary onBack={leaveMethodology} t={t}>
             <Methodology onBack={leaveMethodology} />
           </MethodologyBoundary>
         )}
@@ -491,37 +495,35 @@ function Home(props: {
   onSubmit: () => void;
   onExample: (t: string) => void;
 }) {
+  const { t } = useT();
   return (
     <>
       <div className="hero">
-        <h1>Inspect before you react.</h1>
-        <p>
-          Paste a YouTube link, article URL, or transcript. We show how the content is built — its
-          claims, framing, omissions, and other credible angles — so you can decide what to think.
-        </p>
+        <h1>{t('home.heading')}</h1>
+        <p>{t('home.description')}</p>
         <div className="input-card">
           <textarea
             value={props.input}
             onChange={(e) => props.setInput(e.target.value)}
-            placeholder="Paste a YouTube link, article URL, or transcript…"
+            placeholder={t('home.placeholder')}
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') props.onSubmit();
             }}
           />
           <button className="btn" onClick={props.onSubmit} disabled={!props.input.trim()}>
-            Analyze
+            {t('home.analyze')}
           </button>
         </div>
-        <div className="hint">It assesses claims and cites sources — it never declares "true" or "false".</div>
+        <div className="hint">{t('home.neutralityHint')}</div>
       </div>
 
       <div className="examples">
-        <h4>Or try an example</h4>
+        <h4>{t('home.examplesHeading')}</h4>
         <div className="example-grid">
           {EXAMPLES.map((ex) => (
-            <button key={ex.label} className="example-card" onClick={() => props.onExample(ex.text)}>
-              <strong>{ex.label}</strong>
-              {ex.blurb}
+            <button key={ex.titleKey} className="example-card" onClick={() => props.onExample(ex.text)}>
+              <strong>{t(ex.titleKey)}</strong>
+              {t(ex.blurbKey)}
             </button>
           ))}
         </div>
@@ -531,14 +533,16 @@ function Home(props: {
 }
 
 function Loading(props: { status: string; stepIdx: number }) {
+  const { t } = useT();
+  const steps = STEP_KEYS.map((key) => t(key));
   return (
     <div className="loading">
       <div className="spinner" />
-      <div className="section-label">Analyzing — {props.status}</div>
+      <div className="section-label">{t('loading.analyzing', { status: props.status })}</div>
       <div className="steps">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <div
-            key={s}
+            key={STEP_KEYS[i]}
             className={`step ${i === props.stepIdx ? 'active' : ''} ${i < props.stepIdx ? 'done' : ''}`}
           >
             <span className="dot">{i < props.stepIdx ? '✓' : i + 1}</span>

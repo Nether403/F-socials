@@ -1,7 +1,13 @@
 // Feature: trust-and-launch-bundle, methodology rendering (Validates: 1.1,1.2,1.3,1.4,1.5,1.6,1.8,1.10)
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { LanguageProvider } from '../i18n/context';
 import { Methodology } from './Methodology';
+
+// Helper: wrap in LanguageProvider so useT resolves.
+function renderMethodology(props: { onBack: () => void }) {
+  return render(<LanguageProvider><Methodology {...props} /></LanguageProvider>);
+}
 
 // A fake PolicyDescriptor with a known version and sample tiers/open signals.
 // Hoisted so it can be referenced both by the vi.mock factory and the assertions.
@@ -27,14 +33,14 @@ vi.mock('../api/client', () => ({
 describe('Methodology page rendering', () => {
   // 1.1 — renders with no auth context/provider, just the onBack prop.
   it('renders without authentication', () => {
-    const { container } = render(<Methodology onBack={() => {}} />);
+    const { container } = renderMethodology({ onBack: () => {} });
     expect(container).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /how f-socials works/i })).toBeInTheDocument();
   });
 
   // 1.2 — evidence-outcome vocabulary plus what raises/lowers confidence.
   it('describes evidence outcomes and what raises or lowers confidence', () => {
-    render(<Methodology onBack={() => {}} />);
+    renderMethodology({ onBack: () => {} });
     expect(screen.getByText(/directly matched fact-check/i)).toBeInTheDocument();
     expect(screen.getByText(/no sufficient evidence found/i)).toBeInTheDocument();
     expect(screen.getByText(/not fact-checkable/i)).toBeInTheDocument();
@@ -44,7 +50,7 @@ describe('Methodology page rendering', () => {
 
   // 1.3 + 1.6 — source-tier policy, open signals, and the live (mocked) version.
   it('describes the source-tier policy with open signals and the live version', async () => {
-    render(<Methodology onBack={() => {}} />);
+    renderMethodology({ onBack: () => {} });
     expect(screen.getByText(/source tier policy/i)).toBeInTheDocument();
     // Tier labels and open-signal names load after the async /policy fetch resolves.
     expect(await screen.findByText(/open signals behind each tier/i)).toBeInTheDocument();
@@ -59,7 +65,7 @@ describe('Methodology page rendering', () => {
 
   // 1.4 — who reviews reports and the meaning of each review status.
   it('describes who reviews reports and the review statuses', () => {
-    render(<Methodology onBack={() => {}} />);
+    renderMethodology({ onBack: () => {} });
     expect(screen.getByText(/who reviews reports/i)).toBeInTheDocument();
     expect(screen.getByText(/passed every automated integrity check/i)).toBeInTheDocument();
     expect(screen.getByText(/held the report for a human look/i)).toBeInTheDocument();
@@ -68,14 +74,14 @@ describe('Methodology page rendering', () => {
 
   // 1.5 — how to submit a dispute.
   it('describes how to submit a dispute', () => {
-    render(<Methodology onBack={() => {}} />);
+    renderMethodology({ onBack: () => {} });
     expect(screen.getByText(/how to dispute an analysis/i)).toBeInTheDocument();
     expect(screen.getByText(/dispute this analysis/i)).toBeInTheDocument();
   });
 
   // 1.8 — the neutrality statement: framing/evidence, never verdicts or creator labels.
   it('states the neutrality commitment', () => {
-    render(<Methodology onBack={() => {}} />);
+    renderMethodology({ onBack: () => {} });
     expect(screen.getByText(/our neutrality commitment/i)).toBeInTheDocument();
     expect(screen.getByText(/framing and evidence/i)).toBeInTheDocument();
     expect(
@@ -85,7 +91,7 @@ describe('Methodology page rendering', () => {
 
   // 1.10 — glossary terms defined on first use (rendered via <dfn>).
   it('defines glossary terms on first use', () => {
-    const { container } = render(<Methodology onBack={() => {}} />);
+    const { container } = renderMethodology({ onBack: () => {} });
     expect(container.querySelectorAll('dfn').length).toBeGreaterThan(0);
     // First-use definition of "f-Socials" is shown inline.
     expect(

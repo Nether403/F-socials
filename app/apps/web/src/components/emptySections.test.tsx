@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import fc from 'fast-check';
+import { LanguageProvider } from '../i18n/context';
 import { Report } from './Report';
 import type { AnalysisReport } from '../api/types';
 
@@ -84,7 +85,7 @@ describe('Property 10: empty section shows an empty state while siblings render'
           perspectives: fc.boolean(),
         }),
         (flags) => {
-          render(<Report report={buildReport(flags)} onBack={() => {}} />);
+          render(<LanguageProvider><Report report={buildReport(flags)} onBack={() => {}} /></LanguageProvider>);
           try {
             for (const key of Object.keys(SECTIONS) as (keyof typeof SECTIONS)[]) {
               const { tab, empty, item } = SECTIONS[key];

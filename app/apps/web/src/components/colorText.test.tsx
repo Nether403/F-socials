@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import fc from 'fast-check';
+import { LanguageProvider } from '../i18n/context';
 import { Report } from './Report';
 import type {
   AnalysisReport,
@@ -95,7 +96,7 @@ describe('Property 11: color-coded signals always carry equivalent text', () => 
     fc.assert(
       fc.property(strengthArb, severityArb, tierArb, (evidenceStrength, severity, sourceTier) => {
         const report = makeReport(evidenceStrength, severity, sourceTier);
-        render(<Report report={report} onBack={() => {}} />);
+        render(<LanguageProvider><Report report={report} onBack={() => {}} /></LanguageProvider>);
         try {
           // Claims now sit behind a collapsed disclosure drawer (progressive-disclosure-report-ui
           // Req 2.1); open it so the claim card and its evidence-strength tag render.

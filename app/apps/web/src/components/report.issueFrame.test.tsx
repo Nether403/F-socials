@@ -11,10 +11,11 @@
 // Render facet (single example): the Report's IssueFrame chart renders one marker per axis,
 // each with a non-empty aria-label and a sibling .axis-pos showing the same non-empty text.
 import { describe, it, expect } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
 import { issueFrameAxisText } from './reportView';
+import { renderWithLang } from '../test/renderWithLang';
 import type { AnalysisReport } from '../api/types';
 
 // Coordinates including in-range, out-of-range, and non-finite / edge values. The helper clamps
@@ -65,7 +66,7 @@ describe('Property 9: every issue-frame position has text, and no marker renders
   // Render facet (Req 5.6): since axis text is always present, every rendered marker is paired
   // with non-empty aria-label text and a sibling .axis-pos with non-empty text — never alone.
   it('renders each axis marker only alongside its non-empty axis text', () => {
-    const { container } = render(<Report report={makeReport(0.9, -0.9)} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport(0.9, -0.9)} onBack={() => {}} />);
     try {
       // The issue-frame chart sits behind its own disclosure drawer, collapsed on first paint
       // (Req 2.1); open it so the chart renders.

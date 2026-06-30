@@ -3,11 +3,12 @@
 // Ceiling: nothing survives a restart and the queue won't scale across processes.
 // Upgrade path: Upstash Redis (Cache/Queue) + Postgres (Repository).
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 
-import type { AnalysisReport, AuditRecord, CitationRow, ClaimRow, ContentItem, PerspectiveRow, ResolutionOutcome, ReviewActionResult, ReviewItem, ReviewKind, ReviewLifecycle, ReviewResolutionInput } from '../types';
+import type { AnalysisReport, AuditRecord, CitationRow, ClaimRow, ContentItem, EvidenceOutcome, PerspectiveRow, ResolutionOutcome, ReviewActionResult, ReviewItem, ReviewKind, ReviewLifecycle, ReviewResolutionInput } from '../types';
+import type { HumanSignal } from '../core/kpi';
 import { projectReportGraph } from '../core/reportGraph';
-import type { Annotation, Cache, CollectionItemEntry, Job, JobHandler, Membership, Queue, RateLimiter, Repository, SavedReportEntry, SharedCollection, WorkspaceRole, WorkspaceSummary } from './ports';
+import type { Annotation, Cache, ClaimFilter, CollectionItemEntry, DomainAggregate, Job, JobHandler, Membership, Queue, RateLimitConfig, RateLimiter, RateLimitResult, Repository, SavedReportEntry, SharedCollection, TopicAggregate, TrustGateConfigRow, WorkspaceRole, WorkspaceSummary } from './ports';
 
 // Parse a Review_Item id "{kind}:{sourceId}" (e.g. "dispute:<uuid>") into its
 // parts. Returns null for any malformed id so callers map it to not_found.
@@ -59,7 +60,9 @@ export class InMemoryQueue implements Queue {
 
 export class InMemoryRepository implements Repository {
   private contentByHash = new Map<string, ContentItem>();
-  private reports = new Map<string, AnalysisReport>();
+  // Public so tests can assert read paths persist nothing, mirroring the row maps
+  // below. ponytail: visibility-only; the field is never reassigned.
+  readonly reports = new Map<string, AnalysisReport>();
   // Public so tests can assert persistence without a database (mirrors the
   // disputes/flags table rows, now carrying the additive review-workflow state
   // so review status is readable offline). ponytail: append-only, non-durable.
@@ -90,6 +93,12 @@ export class InMemoryRepository implements Repository {
   // Map<collectionId, Map<reportId, addedAt>> — at most one item per (collection, report).
   private itemsByCollection = new Map<string, Map<string, string>>();
   private annotations = new Map<string, Annotation>(); // annotationId -> Annotation
+
+  // --- Institutional API (intervention-and-scale) ---
+  // ponytail: single-process, non-durable — fine for dev/tests.
+  private apiKeys = new Map<string, { keyId: string; institutionId: string; hash: string; rateLimit?: RateLimitConfig; revokedAt?: string; createdAt: string }>();
+  private apiKeyWindows = new Map<string, { count: number; expiresAt: number }>(); // keyId -> window
+  private trustGateConfigs = new Map<string, TrustGateConfigRow>(); // capability -> row
 
   async findContentByHash(hash: string): Promise<ContentItem | undefined> {
     return this.contentByHash.get(hash);
@@ -470,6 +479,275 @@ export class InMemoryRepository implements Repository {
 
   async deleteAnnotation(annotationId: string): Promise<void> {
     this.annotations.delete(annotationId);
+  }
+
+  // ---- Institutional API keys (intervention-and-scale) ---------------------
+
+  async createApiKey(institutionId: string): Promise<{ keyId: string; plaintext: string }> {
+    // Enforce ≤10 active keys per institution (Req 6.7).
+    const active = [...this.apiKeys.values()].filter(
+      (k) => k.institutionId === institutionId && !k.revokedAt,
+    ).length;
+    if (active >= 10) throw new Error('ActiveKeyLimit');
+
+    const plaintext = randomBytes(32).toString('base64url');
+    const hash = createHash('sha256').update(plaintext).digest('hex');
+    const keyId = randomUUID();
+    this.apiKeys.set(keyId, { keyId, institutionId, hash, createdAt: new Date().toISOString() });
+    return { keyId, plaintext };
+  }
+
+  async findApiKeyByHash(hash: string): Promise<{ keyId: string; institutionId: string; rateLimit?: RateLimitConfig } | undefined> {
+    for (const entry of this.apiKeys.values()) {
+      if (entry.hash === hash && !entry.revokedAt) {
+        return { keyId: entry.keyId, institutionId: entry.institutionId, ...(entry.rateLimit ? { rateLimit: entry.rateLimit } : {}) };
+      }
+    }
+    return undefined;
+  }
+
+  async revokeApiKey(keyId: string): Promise<void> {
+    const entry = this.apiKeys.get(keyId);
+    if (entry && !entry.revokedAt) entry.revokedAt = new Date().toISOString();
+  }
+
+  async countActiveApiKeys(institutionId: string): Promise<number> {
+    let count = 0;
+    for (const entry of this.apiKeys.values()) {
+      if (entry.institutionId === institutionId && !entry.revokedAt) count++;
+    }
+    return count;
+  }
+
+  // ---- Per-key institutional rate limiting (intervention-and-scale) ---------
+
+  async institutionalHit(keyId: string, cfg: RateLimitConfig): Promise<RateLimitResult> {
+    const now = Date.now();
+    let window = this.apiKeyWindows.get(keyId);
+    if (!window || window.expiresAt <= now) {
+      window = { count: 0, expiresAt: now + cfg.windowSeconds * 1000 };
+      this.apiKeyWindows.set(keyId, window);
+    }
+    window.count++;
+    return {
+      allowed: window.count <= cfg.maxRequests,
+      remaining: Math.max(0, cfg.maxRequests - window.count),
+      limit: cfg.maxRequests,
+      resetSeconds: Math.ceil((window.expiresAt - now) / 1000),
+    };
+  }
+
+  // ---- Trust-gate config (intervention-and-scale) --------------------------
+
+  async getTrustGateConfig(capability: string): Promise<TrustGateConfigRow | undefined> {
+    return this.trustGateConfigs.get(capability);
+  }
+
+  // ---- Read-only metric aggregates (intervention-and-scale) ----------------
+
+  async listEvidenceOutcomes(): Promise<Array<{ reportId: string; claimId: string; evidenceOutcome: EvidenceOutcome }>> {
+    const results: Array<{ reportId: string; claimId: string; evidenceOutcome: EvidenceOutcome }> = [];
+    for (const [reportId, records] of this.auditRecords) {
+      for (const record of records) {
+        results.push({ reportId, claimId: record.claimId, evidenceOutcome: record.evidenceOutcome });
+      }
+    }
+    return results;
+  }
+
+  async listHumanSignals(): Promise<HumanSignal[]> {
+    const signals: HumanSignal[] = [];
+    // Disputes → report+claim id only, no submitter identity (Req 8.7).
+    for (const d of this.disputes) {
+      if (d.claimId) signals.push({ kind: 'dispute', reportId: d.reportId, claimId: d.claimId });
+    }
+    // Flags → report+claim id only. Flags don't always carry a claimId in the
+    // current schema, so we skip those that don't (no claim to pair with).
+    // ponytail: flags reference technique, not claim — only flags with claimId
+    // would be paired. Current schema doesn't carry claimId on flags, so flags
+    // contribute no signal here. This mirrors the Postgres query which joins on
+    // claim_id and excludes nulls.
+    return signals;
+  }
+
+  // ---- Read-only Report_Graph query methods (intervention-and-scale) -------
+
+  async queryClaims(filter: ClaimFilter): Promise<{ items: ClaimRow[]; totalCount: number }> {
+    // Collect all claim rows across all reports.
+    let claims: ClaimRow[] = [];
+    // Deterministic ordering: iterate reports by key insertion order, claims by ordinal.
+    for (const rows of this.claimRows.values()) {
+      claims.push(...rows);
+    }
+
+    // Apply filters.
+    if (filter.reportId) {
+      claims = claims.filter((c) => c.reportId === filter.reportId);
+    }
+    if (filter.keyword) {
+      const kw = filter.keyword.toLowerCase();
+      claims = claims.filter((c) => c.claimText.toLowerCase().includes(kw));
+    }
+    if (filter.topic) {
+      // Match claims whose report has a perspective with the given issueFrameLabel.
+      const reportIdsWithTopic = new Set<string>();
+      for (const [reportId, perspectives] of this.perspectiveRows) {
+        if (perspectives.some((p) => p.issueFrameLabel === filter.topic)) {
+          reportIdsWithTopic.add(reportId);
+        }
+      }
+      claims = claims.filter((c) => reportIdsWithTopic.has(c.reportId));
+    }
+    if (filter.fromDate) {
+      // Filter by report createdAt (claims don't have their own timestamp).
+      const from = filter.fromDate;
+      claims = claims.filter((c) => {
+        const report = this.reports.get(c.reportId);
+        return report ? report.createdAt >= from : false;
+      });
+    }
+    if (filter.toDate) {
+      const to = filter.toDate;
+      claims = claims.filter((c) => {
+        const report = this.reports.get(c.reportId);
+        return report ? report.createdAt <= to : false;
+      });
+    }
+
+    // Stable sort: reportId ASC, then ordinal ASC (deterministic, mirrors Postgres ORDER BY).
+    claims.sort((a, b) =>
+      a.reportId < b.reportId ? -1
+      : a.reportId > b.reportId ? 1
+      : a.ordinal - b.ordinal,
+    );
+
+    const totalCount = claims.length;
+
+    // Pagination.
+    const pageSize = Math.max(1, Math.min(200, filter.pageSize ?? 50));
+    const page = Math.max(0, (filter.page ?? 0));
+    const offset = page * pageSize;
+    const items = claims.slice(offset, offset + pageSize);
+
+    return { items, totalCount };
+  }
+
+  async listCitationsForClaim(claimUid: string): Promise<CitationRow[]> {
+    // Scan all citation rows for this claimUid.
+    const results: CitationRow[] = [];
+    for (const rows of this.citationRows.values()) {
+      for (const row of rows) {
+        if (row.claimUid === claimUid) results.push(row);
+      }
+    }
+    // Deterministic content order matching the Postgres driver (Req 14.2):
+    // sourceUrl, then sourceName, then excerpt (undefined sorts as '').
+    results.sort((a, b) =>
+      a.sourceUrl < b.sourceUrl ? -1 : a.sourceUrl > b.sourceUrl ? 1
+      : (a.sourceName ?? '') < (b.sourceName ?? '') ? -1 : (a.sourceName ?? '') > (b.sourceName ?? '') ? 1
+      : (a.excerpt ?? '') < (b.excerpt ?? '') ? -1 : (a.excerpt ?? '') > (b.excerpt ?? '') ? 1
+      : 0,
+    );
+    return results;
+  }
+
+  async listPerspectivesForReport(reportId: string): Promise<PerspectiveRow[]> {
+    // Deterministic content order matching the Postgres driver (Req 14.2):
+    // url, then issueFrameLabel (undefined sorts as ''). Return a sorted copy so
+    // the stored array is never mutated.
+    return [...(this.perspectiveRows.get(reportId) ?? [])].sort((a, b) =>
+      a.url < b.url ? -1 : a.url > b.url ? 1
+      : (a.issueFrameLabel ?? '') < (b.issueFrameLabel ?? '') ? -1
+      : (a.issueFrameLabel ?? '') > (b.issueFrameLabel ?? '') ? 1
+      : 0,
+    );
+  }
+
+  async aggregateByDomain(): Promise<DomainAggregate[]> {
+    // Group citations by source domain; compute per-domain report count, claim count,
+    // and mean cited-claim ratio (cited claims / total claims in that report).
+    const domainMap = new Map<string, { reportIds: Set<string>; claimUids: Set<string> }>();
+
+    for (const rows of this.citationRows.values()) {
+      for (const row of rows) {
+        let domain: string;
+        try {
+          domain = new URL(row.sourceUrl).hostname;
+        } catch {
+          domain = row.sourceUrl; // fallback for malformed URLs
+        }
+        let entry = domainMap.get(domain);
+        if (!entry) {
+          entry = { reportIds: new Set(), claimUids: new Set() };
+          domainMap.set(domain, entry);
+        }
+        // Find which report this claim belongs to.
+        for (const [reportId, claims] of this.claimRows) {
+          if (claims.some((c) => c.claimUid === row.claimUid)) {
+            entry.reportIds.add(reportId);
+            break;
+          }
+        }
+        entry.claimUids.add(row.claimUid);
+      }
+    }
+
+    const aggregates: DomainAggregate[] = [];
+    for (const [domain, entry] of domainMap) {
+      // Mean cited-claim ratio: for each report, (cited claims in that report for
+      // this domain) / (total claims in that report). Average over all reports.
+      let totalRatio = 0;
+      for (const reportId of entry.reportIds) {
+        const reportClaims = this.claimRows.get(reportId) ?? [];
+        const totalClaims = reportClaims.length;
+        if (totalClaims === 0) continue;
+        // Count claims in this report that have at least one citation from this domain.
+        const reportCitations = this.citationRows.get(reportId) ?? [];
+        const citedClaimUids = new Set<string>();
+        for (const cit of reportCitations) {
+          let citDomain: string;
+          try { citDomain = new URL(cit.sourceUrl).hostname; } catch { citDomain = cit.sourceUrl; }
+          if (citDomain === domain) citedClaimUids.add(cit.claimUid);
+        }
+        totalRatio += citedClaimUids.size / totalClaims;
+      }
+      const meanCitedClaimRatio = entry.reportIds.size > 0 ? totalRatio / entry.reportIds.size : 0;
+
+      aggregates.push({
+        domain,
+        reportCount: entry.reportIds.size,
+        claimCount: entry.claimUids.size,
+        meanCitedClaimRatio,
+      });
+    }
+
+    // Deterministic sort: domain ASC.
+    aggregates.sort((a, b) => (a.domain < b.domain ? -1 : a.domain > b.domain ? 1 : 0));
+    return aggregates;
+  }
+
+  async aggregateByTopic(): Promise<TopicAggregate[]> {
+    // Group reports by issueFrameLabel from their perspectives.
+    const topicMap = new Map<string, Set<string>>(); // issueFrameLabel -> set of reportIds
+    for (const [reportId, perspectives] of this.perspectiveRows) {
+      for (const p of perspectives) {
+        let reportIds = topicMap.get(p.issueFrameLabel);
+        if (!reportIds) {
+          reportIds = new Set();
+          topicMap.set(p.issueFrameLabel, reportIds);
+        }
+        reportIds.add(reportId);
+      }
+    }
+
+    const aggregates: TopicAggregate[] = [];
+    for (const [issueFrameLabel, reportIds] of topicMap) {
+      aggregates.push({ issueFrameLabel, reportCount: reportIds.size });
+    }
+
+    // Deterministic sort: issueFrameLabel ASC.
+    aggregates.sort((a, b) => (a.issueFrameLabel < b.issueFrameLabel ? -1 : a.issueFrameLabel > b.issueFrameLabel ? 1 : 0));
+    return aggregates;
   }
 }
 

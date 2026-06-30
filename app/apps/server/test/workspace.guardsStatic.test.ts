@@ -166,8 +166,15 @@ test('Req 9.1: workspace route handlers contain no direct DB query', () => {
 test('Req 9.6: Postgres workspace methods use parameterized SQL only', () => {
   const src = readFileSync(postgresPath, 'utf8');
   const start = src.indexOf('Institutional workspace (institutional-workspace)');
+  // Bound the slice to the workspace methods only: end at the banner of the
+  // section that immediately follows them (the intervention-and-scale API-keys
+  // block). Slicing to EOF would scan unrelated later methods (e.g. read-only
+  // Report_Graph queries) whose legitimate `${idx}` placeholder-index and
+  // `%${keyword}%` bound-value expressions would trip the negative checks below.
+  const end = src.indexOf('Institutional API keys (intervention-and-scale)', start);
   assert.ok(start !== -1, 'postgres.ts should contain the Institutional workspace section');
-  const section = src.slice(start);
+  assert.ok(end !== -1 && end > start, 'a section should follow the Institutional workspace methods');
+  const section = src.slice(start, end);
 
   // Sanity: the workspace methods are all present in the sliced section.
   for (const method of [

@@ -9,7 +9,7 @@ import { makeWorker } from './pipeline/worker';
 import { makeRouter } from './http/routes';
 import { optionalAuth } from './http/auth';
 
-const { repo, cache, queue, limiter, telemetry, providers, meta } = buildContext();
+const { repo, cache, queue, limiter, telemetry, providers, coachingLLM, meta } = buildContext();
 
 // --- worker consumes the queue in-process only in dev (deployed runs worker.ts separately) ---
 if (config.runWorkerInProcess) {
@@ -46,7 +46,7 @@ if (config.corsOrigin) {
 
 app.use(express.json({ limit: '1mb' }));
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter, telemetry }));
+app.use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter, telemetry, coachingLLM }));
 
 // Basic error handler (Express 5 forwards async rejections here).
 app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {

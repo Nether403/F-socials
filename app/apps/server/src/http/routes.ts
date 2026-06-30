@@ -7,6 +7,10 @@ import type { AnalysisReport, ContentItem, RawInput } from '../types';
 import { cacheKey } from '../core/hash';
 import { policyDescriptor } from '../core/sourceTier';
 import { deriveReportReviewStatus } from '../core/reportReviewStatus';
+import { buildTrustMetrics } from '../core/metricsStore';
+import { evaluateTrustGate } from '../core/trustGate';
+import { projectFrictionOverlay } from '../core/frictionOverlay';
+import { analyzeDraft, type LLMProvider } from '../core/coaching';
 import {
   submitSchema,
   disputeSchema,
@@ -19,10 +23,44 @@ import {
   collectionItemSchema,
   annotationTextSchema,
   inviteCodeParam,
+  frictionQuerySchema,
+  coachingBodySchema,
 } from './validation';
-import { requireAuth, reviewerGuard } from './auth';
+import { requireAuth, reviewerGuard, apiKeyAuth } from './auth';
+import { sendNeutral } from './respond';
+import { config } from '../config';
+import { resolveRateConfig } from '../concurrency';
+import { graphql } from 'graphql';
+import { schema } from '../graphql/schema';
+import { makeRootValue } from '../graphql/resolvers';
 
-export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter; telemetry: Telemetry }): Router {
+// ponytail: per-user rolling-window limiter for the coaching endpoint — 10
+// requests / 60s, keyed by `user:<jwt sub>` (Req 10.8). Module-level Map, so it
+// persists across requests for the life of the process. Ceiling: per-process
+// only — a multi-instance deploy enforces the limit per instance, not globally.
+// We can't reuse repo.institutionalHit here: its Postgres backing table keys on a
+// UUID FK into api_keys, so a `user:<sub>` key would fail the cast/constraint.
+// Upgrade path: a repo-backed rolling counter with in-memory + Postgres parity.
+const COACHING_LIMIT = 10;
+const COACHING_WINDOW_MS = 60_000;
+const coachingHits = new Map<string, number[]>();
+
+function coachingRateHit(key: string, now = Date.now()): { allowed: boolean; retryAfterSeconds: number } {
+  const cutoff = now - COACHING_WINDOW_MS;
+  const recent = (coachingHits.get(key) ?? []).filter((t) => t > cutoff);
+  if (recent.length >= COACHING_LIMIT) {
+    // Retry-After = whole seconds until the oldest in-window hit ages out.
+    const oldest = recent[0]!;
+    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + COACHING_WINDOW_MS - now) / 1000));
+    coachingHits.set(key, recent);
+    return { allowed: false, retryAfterSeconds };
+  }
+  recent.push(now);
+  coachingHits.set(key, recent);
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue; limiter: RateLimiter; telemetry: Telemetry; coachingLLM?: LLMProvider }): Router {
   const router = Router();
 
   const paramId = (req: Request): string | undefined => {
@@ -552,6 +590,192 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
   // the methodology page so the tiering rules are inspectable (1.6, 2.5).
   router.get('/policy', (_req: Request, res: Response) => {
     return res.json(policyDescriptor());
+  });
+
+  // GET /api/v1/friction?url=<feed URL> — PUBLIC lens-safe overlay for an
+  // already-analyzed feed item (no auth — the payload carries no verdict and no
+  // creator rating; Req 1.1, 2.2). Read-only: it consumes the readiness the
+  // pipeline already produced and never calls assembleReport.
+  router.get('/friction', async (req: Request, res: Response) => {
+    // 1. Validate query (required url) at the trust boundary.
+    const parsed = frictionQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+
+    // 2. Feed_Friction trust gate, re-evaluated live every request (Req 1.4, 5.6).
+    //    Fail-closed: any undefined metric or unset legal flag ⇒ 503.
+    const metrics = await buildTrustMetrics({ repo: deps.repo });
+    const gate = evaluateTrustGate(metrics, config.trustThresholds.feed_friction);
+    if (!gate.satisfied) {
+      return res.status(503).json({ error: 'capability_unavailable' });
+    }
+
+    // 3. Resolve the stored content for this feed URL using the SAME content-hash
+    //    normalization the analysis intake keyed under. The cacheKey baked in the
+    //    sourceType, so try the url-bearing source types (youtube|article) and
+    //    take the first that resolves a ready report.
+    // ponytail: the ready report is read from the urlHash→ready-report cache (the
+    //    only content→report link the repo exposes). Ceiling: a cold cache 404s a
+    //    ready report (safe withhold, never a false overlay); upgrade path is a
+    //    repo.getReportByContentId index.
+    let report: AnalysisReport | undefined;
+    for (const sourceType of ['youtube', 'article'] as const) {
+      const hash = cacheKey({ sourceType, url: parsed.data.url });
+      const content = await deps.repo.findContentByHash(hash);
+      if (!content) continue;
+      report = await deps.cache.get(hash);
+      if (report) break;
+    }
+
+    // 4. Missing OR not ready ⇒ 404, no overlay (Req 2.3).
+    if (!report || report.status !== 'ready') {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    // 5. Pure projection, then the neutrality boundary (withholds → 404 on fail; Req 15.7).
+    const overlay = projectFrictionOverlay(report, config.corsOrigin);
+    return sendNeutral(res, 200, overlay);
+  });
+
+  // POST /api/v1/coaching — authenticated, advisory-only pre-publish coaching.
+  // Order is load-bearing: auth → validate → trust gate → rate limit → analyze →
+  // neutrality boundary. The Coaching_Engine holds no repo/queue/telemetry handle,
+  // so the draft is analyzed ephemerally and NOTHING is persisted
+  // (Req 10.5, 10.6, 10.7, 10.8, 11.7, 12.1, 15.7).
+  router.post('/coaching', requireAuth, async (req: Request, res: Response) => {
+    // 1. requireAuth (above) already 401s without a valid Access_Token — the engine
+    //    is never invoked for an unauthenticated caller (Req 10.6).
+
+    // 2. Validate body: draft trimmed length 1..50000 (Req 10.5). On invalid input
+    //    the engine is NOT invoked.
+    const parsed = coachingBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+
+    // 3. Coaching trust gate, re-evaluated live every request (Req 12.1). Fail-closed:
+    //    any undefined metric or unset legal flag ⇒ 503, engine not invoked. Because
+    //    the gate defaults dark, this 503s before coachingLLM is ever needed.
+    const gate = evaluateTrustGate(await buildTrustMetrics({ repo: deps.repo }), config.trustThresholds.coaching);
+    if (!gate.satisfied) {
+      return res.status(503).json({ error: 'coaching_unavailable' });
+    }
+
+    // 4. Per-user rolling rate limit: 10 requests / 60s keyed by `user:<jwt sub>` (Req 10.8).
+    const rl = coachingRateHit(`user:${req.user!.id}`);
+    if (!rl.allowed) {
+      res.setHeader('Retry-After', rl.retryAfterSeconds); // whole seconds to window reset
+      return res.status(429).json({ error: 'rate_limited', retryAfterSeconds: rl.retryAfterSeconds });
+    }
+
+    // 5. Gate satisfied but the LLM provider seam isn't wired yet (pre-14.1) ⇒ 500
+    //    rather than invoke a missing dependency (Req 11.7).
+    if (!deps.coachingLLM) {
+      return res.status(500).json({ error: 'coaching_unavailable' });
+    }
+
+    // 6. Analyze the draft under a ≤30s budget. Timeout OR any thrown error ⇒ 500,
+    //    nothing persisted (Req 10.7, 11.7). analyzeDraft itself never persists and
+    //    degrades gracefully, so the timeout is the real failure mode here.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        analyzeDraft(parsed.data.draft, { llm: deps.coachingLLM }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('coaching_timeout')), 30_000);
+        }),
+      ]);
+      // 7. Neutrality boundary (withholds on fail; Req 15.7), else 200.
+      return sendNeutral(res, 200, result);
+    } catch {
+      return res.status(500).json({ error: 'coaching_unavailable' });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  });
+
+  // POST /api/v1/graphql — Institutional API: API-key-authenticated, per-key
+  // rate-limited, trust-gated, read-only GraphQL over the Report_Graph. Order is
+  // load-bearing: auth → rate limit → gate → execute (Req 1.2, 1.4, 7.6, 7.8,
+  // 8.1, 8.3, 9.5, 15.7).
+  router.post('/graphql', apiKeyAuth(deps.repo), async (req: Request, res: Response) => {
+    // 1. apiKeyAuth (above) already 401s a missing/revoked/unknown key BEFORE we
+    //    reach here, so the query is neither executed nor rate-counted for those.
+
+    // 2. Per-key fixed-window rate limit (Req 8.1, 8.3). resolveRateConfig applies
+    //    the 100/60s default and clamps the window to [1, 86400].
+    const cfg = resolveRateConfig(req.apiKey?.rateLimit);
+    const rl = await deps.repo.institutionalHit(req.apiKey!.keyId, cfg);
+    res.setHeader('X-RateLimit-Limit', rl.limit);
+    res.setHeader('X-RateLimit-Remaining', rl.remaining);
+    if (!rl.allowed) {
+      res.setHeader('Retry-After', rl.resetSeconds); // whole seconds to window reset
+      return res.status(429).json({ error: 'rate_limited', retryAfterSeconds: rl.resetSeconds });
+    }
+
+    // 3. Institutional_API trust gate, re-evaluated live every request (Req 1.4).
+    //    Fail-closed: any undefined metric or unset legal flag ⇒ 503.
+    const gate = evaluateTrustGate(await buildTrustMetrics({ repo: deps.repo }), config.trustThresholds.institutional_api);
+    if (!gate.satisfied) {
+      return res.status(503).json({ error: 'capability_unavailable' });
+    }
+
+    // 4. Read-only GraphQL execution. Invalid syntax/unknown fields yield a
+    //    structured `errors` response automatically and resolvers are not run (Req 7.8).
+    const result = await graphql({
+      schema,
+      source: req.body?.query ?? '',
+      rootValue: makeRootValue(deps.repo),
+      variableValues: req.body?.variables,
+    });
+
+    // 5. Neutrality boundary. Standard GraphQL-over-HTTP returns 200 even when the
+    //    result carries `errors` (Req 15.7).
+    return sendNeutral(res, 200, result);
+  });
+
+  // --- Institutional API key administration (intervention-and-scale) ---------
+  // ponytail: these are admin routes. The design (Req 6.5) calls for a separate
+  // key-admin auth path distinct from the reader JWT, but no institutional-admin
+  // authz seam exists in this codebase yet. Following the repo convention that
+  // mutating/identity routes are gated, they sit behind requireAuth for now;
+  // upgrade path is a dedicated institutional-admin guard (e.g. an admin role /
+  // separate admin token) layered here once that seam lands. Do NOT serve these
+  // anonymously in production.
+
+  // POST /api/v1/institutions/:institutionId/keys — issue a new API key. The
+  // plaintext is generated (randomBytes(32).base64url), only its SHA-256 hash is
+  // persisted, and it is returned ONCE here — unrecoverable afterward (Req 6.1, 6.8).
+  router.post('/institutions/:institutionId/keys', requireAuth, async (req: Request, res: Response) => {
+    const institutionId = getParam(req, 'institutionId');
+    if (!institutionId) return res.status(400).json({ error: 'missing_institution_id' });
+    try {
+      const { keyId, plaintext } = await deps.repo.createApiKey(institutionId);
+      // Plaintext shown exactly once (Req 6.1, 6.8).
+      return res.status(201).json({ apiKey: plaintext, keyId });
+    } catch (err) {
+      // Active-key limit (≤10 per institution) ⇒ 409, no key persisted (Req 6.7).
+      if (err instanceof Error && /ActiveKeyLimit/.test(err.message)) {
+        return res.status(409).json({ error: 'active_key_limit' });
+      }
+      throw err;
+    }
+  });
+
+  // DELETE /api/v1/institutions/:institutionId/keys/:keyId — revoke a key.
+  // Revocation flips revoked_at, effective immediately (≤60s; Req 6.4). Idempotent.
+  router.delete('/institutions/:institutionId/keys/:keyId', requireAuth, async (req: Request, res: Response) => {
+    const keyId = getParam(req, 'keyId');
+    if (!keyId) return res.status(400).json({ error: 'missing_key_id' });
+    await deps.repo.revokeApiKey(keyId);
+    return res.status(204).end();
+  });
+
+  // GET /api/v1/institutions/:institutionId/keys/:keyId/value — always 404.
+  // The plaintext is never stored and is unrecoverable after issuance (Req 6.8).
+  router.get('/institutions/:institutionId/keys/:keyId/value', requireAuth, (_req: Request, res: Response) => {
+    return res.status(404).json({ error: 'not_found' });
   });
 
   // GET /api/v1/r/:slug — PUBLIC read-only shared report (no auth required).

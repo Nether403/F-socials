@@ -8,9 +8,10 @@
 //   2. Rendered check (small fixed set): <Report> with an issueFrame exposes non-empty
 //      axis-position text (.axis-pos) and non-empty marker aria-labels.
 import { describe, it, expect } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report, issueFramePositionText, issueFrameAxisText } from './Report';
+import { renderWithLang } from '../test/renderWithLang';
 import type { AnalysisReport } from '../api/types';
 
 // Coordinates strictly within the documented [-1, 1] input space.
@@ -69,7 +70,7 @@ describe('Property 13: every issue-frame position has screen-reader text', () =>
     const coords = [-1, 0, 1];
     for (const x of coords) {
       for (const y of coords) {
-        const { container } = render(<Report report={makeReport(x, y)} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={makeReport(x, y)} onBack={() => {}} />);
         try {
           // The issue-frame chart sits behind its own disclosure drawer, collapsed on first
           // paint (progressive-disclosure-report-ui Req 2.1); open it to render the chart.

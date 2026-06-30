@@ -24,6 +24,7 @@ import * as axeMatchers from 'vitest-axe/matchers';
 import { Report } from './Report';
 
 expect.extend(axeMatchers);
+import { LanguageProvider } from '../i18n/context';
 import type { AnalysisReport } from '../api/types';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -148,7 +149,7 @@ describe('accent color audit (Req 4.5)', () => {
 
 describe('axe ARIA-wiring scan (Req 4.3, 4.4, 1.9)', () => {
   it('a representative report has no WCAG A/AA ARIA-wiring violations', async () => {
-    const { container } = render(<Report report={fullReport} onBack={() => {}} />);
+    const { container } = render(<LanguageProvider><Report report={fullReport} onBack={() => {}} /></LanguageProvider>);
     // jsdom cannot measure real contrast, so color-contrast is excluded here and
     // covered by the CSS-variable audit (task 12.3) + manual review. Restricting to
     // wcag2a/wcag2aa also drops document-level best-practice rules (landmarks/h1)
@@ -164,7 +165,7 @@ describe('axe ARIA-wiring scan (Req 4.3, 4.4, 1.9)', () => {
   // pin the key wiring the design relies on (1.9 ARIA, 4.8/4.9 color-never-alone).
   it('exposes the key ARIA hooks: marker role/label, framing description, modal dialog', async () => {
     const user = userEvent.setup();
-    render(<Report report={fullReport} onBack={() => {}} />);
+    render(<LanguageProvider><Report report={fullReport} onBack={() => {}} /></LanguageProvider>);
 
     // Issue-frame markers are role="img" with a textual aria-label (color-never-alone).
     // The issue-frame chart now sits behind its own disclosure drawer, collapsed on first

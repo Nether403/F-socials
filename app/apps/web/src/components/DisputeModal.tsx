@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { submitDispute } from '../api/client';
 import { track } from '../analytics';
+import { useT } from '../i18n/context';
 
 const MAX = 2000; // mirror the server's disputeSchema reason bound (1..2000)
 
@@ -28,6 +29,7 @@ export function DisputeModal({
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const { t } = useT();
 
   // Move focus into the dialog on open and whenever the body swaps (form ⇄ confirmation),
   // trap Tab within it, and close on Escape (4.7). The opener-focus restore lives in onClose.
@@ -94,9 +96,9 @@ export function DisputeModal({
       >
         <div className="modal-head">
           <h3 id="dispute-title" className="editorial">
-            Dispute this analysis
+            {t('dispute.title')}
           </h3>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close dispute form">
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('dispute.close')}>
             <X size={16} />
           </button>
         </div>
@@ -104,22 +106,21 @@ export function DisputeModal({
         {done ? (
           <div>
             <div className="banner" role="status">
-              Thanks — your dispute was received and will be reviewed.
+              {t('dispute.received')}
             </div>
             <div className="modal-actions">
               <button type="button" className="btn" onClick={onClose}>
-                Close
+                {t('dispute.closeBtn')}
               </button>
             </div>
           </div>
         ) : (
           <form onSubmit={onSubmit}>
             <p className="modal-note">
-              Tell us what you think is wrong with this analysis. Disputes are recorded anonymously for
-              later human review.
+              {t('dispute.note')}
             </p>
             <label className="modal-label" htmlFor="dispute-reason">
-              Your reason
+              {t('dispute.label')}
             </label>
             <textarea
               id="dispute-reason"
@@ -127,7 +128,7 @@ export function DisputeModal({
               value={reason}
               maxLength={MAX}
               rows={5}
-              placeholder="What did we get wrong?"
+              placeholder={t('dispute.placeholder')}
               onChange={(e) => setReason(e.target.value)}
               autoFocus
             />
@@ -141,10 +142,10 @@ export function DisputeModal({
             )}
             <div className="modal-actions">
               <button type="button" className="btn btn-ghost" onClick={onClose}>
-                Cancel
+                {t('dispute.cancel')}
               </button>
               <button type="submit" className="btn" disabled={!valid || submitting}>
-                {submitting ? 'Submitting…' : 'Submit dispute'}
+                {submitting ? t('dispute.submitting') : t('dispute.submit')}
               </button>
             </div>
           </form>

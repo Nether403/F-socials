@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { LanguageProvider } from '../i18n/context';
 import { Report } from './Report';
 import type { AnalysisReport } from '../api/types';
 import type { UseSession, PendingGatedAction } from '../auth/useSession';
@@ -99,7 +100,7 @@ describe('Report gated Save — active session', () => {
     const user = userEvent.setup();
     const session = makeSession({ token: TOKEN, configured: true });
     const onRequireSignIn = vi.fn();
-    render(<Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} /></LanguageProvider>);
 
     const save = screen.getByRole('button', { name: /save/i });
     expect(save).not.toBeDisabled();
@@ -121,7 +122,7 @@ describe('Report gated Save — active session', () => {
     const d = deferred<void>();
     api.saveReport.mockReturnValue(d.promise);
     const session = makeSession({ token: TOKEN, configured: true });
-    render(<Report report={fakeReport} onBack={() => {}} session={session} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} /></LanguageProvider>);
 
     const save = screen.getByRole('button', { name: /save/i });
     await user.click(save);
@@ -143,7 +144,7 @@ describe('Report gated Save — active session', () => {
     const user = userEvent.setup();
     api.saveReport.mockRejectedValue(new Error('network down'));
     const session = makeSession({ token: TOKEN, configured: true });
-    render(<Report report={fakeReport} onBack={() => {}} session={session} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} /></LanguageProvider>);
 
     const save = screen.getByRole('button', { name: /save/i });
     await user.click(save);
@@ -165,7 +166,7 @@ describe('Report gated controls — anonymous + configured', () => {
     const user = userEvent.setup();
     const session = makeSession({ token: null, configured: true });
     const onRequireSignIn = vi.fn();
-    render(<Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} /></LanguageProvider>);
 
     await user.click(screen.getByRole('button', { name: /save/i }));
 
@@ -180,7 +181,7 @@ describe('Report gated controls — anonymous + configured', () => {
     const user = userEvent.setup();
     const session = makeSession({ token: null, configured: true });
     const onRequireSignIn = vi.fn();
-    render(<Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} /></LanguageProvider>);
 
     const flag = await openFraming(user);
     await user.click(flag);
@@ -200,7 +201,7 @@ describe('Report gated controls — not configured', () => {
     const user = userEvent.setup();
     const session = makeSession({ token: null, configured: false });
     const onRequireSignIn = vi.fn();
-    render(<Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} onRequireSignIn={onRequireSignIn} /></LanguageProvider>);
 
     await user.click(screen.getByRole('button', { name: /save/i }));
 
@@ -221,7 +222,7 @@ describe('Report gated Flag — active session', () => {
     const d = deferred<void>();
     api.submitFlag.mockReturnValue(d.promise);
     const session = makeSession({ token: TOKEN, configured: true });
-    render(<Report report={fakeReport} onBack={() => {}} session={session} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} /></LanguageProvider>);
 
     const flag = await openFraming(user);
     await user.click(flag);
@@ -239,7 +240,7 @@ describe('Report gated Flag — active session', () => {
     const user = userEvent.setup();
     api.submitFlag.mockRejectedValue(new Error('network down'));
     const session = makeSession({ token: TOKEN, configured: true });
-    render(<Report report={fakeReport} onBack={() => {}} session={session} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} session={session} /></LanguageProvider>);
 
     const flag = await openFraming(user);
     await user.click(flag);

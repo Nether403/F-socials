@@ -140,8 +140,15 @@ test('Req 11.1: saved-report route handlers contain no direct DB query', () => {
 test('Req 11.5: Postgres saved-report methods use parameterized SQL only', () => {
   const src = readFileSync(postgresPath, 'utf8');
   const start = src.indexOf('Saved reports (accounts-save-history)');
+  // Bound the slice to the saved-report methods only: end at the banner of the
+  // section that immediately follows them (the institutional-workspace block).
+  // Slicing to EOF would scan unrelated later methods (e.g. read-only
+  // Report_Graph queries) whose legitimate `${idx}` placeholder-index and
+  // `%${keyword}%` bound-value expressions would trip the negative checks below.
+  const end = src.indexOf('Institutional workspace (institutional-workspace)', start);
   assert.ok(start !== -1, 'postgres.ts should contain the Saved reports section');
-  const section = src.slice(start);
+  assert.ok(end !== -1 && end > start, 'a section should follow the Saved reports methods');
+  const section = src.slice(start, end);
 
   // Sanity: the three methods are all present in the sliced section.
   for (const method of ['saveSavedReport', 'removeSavedReport', 'listSavedReports']) {

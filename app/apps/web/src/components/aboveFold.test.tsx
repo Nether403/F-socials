@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import fc from 'fast-check';
+import { LanguageProvider } from '../i18n/context';
 import { Report, topFramingSignal } from './Report';
 import type { AnalysisReport, FramingSignal } from '../api/types';
 
@@ -49,7 +50,7 @@ describe('Property 14: TLDR and top framing signal render unexpanded on first pa
         const top = topFramingSignal(signals)!;
 
         // Render and assert immediately, without any interaction.
-        render(<Report report={buildReport(tldr, signals)} onBack={() => {}} />);
+        render(<LanguageProvider><Report report={buildReport(tldr, signals)} onBack={() => {}} /></LanguageProvider>);
         try {
           // TLDR text is on screen at first paint.
           expect(screen.getAllByText(byText(tldr)).length).toBeGreaterThan(0);

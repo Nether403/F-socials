@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import type { AnalysisReport } from '../api/types';
+import { useT } from '../i18n/context';
 import { topFramingSignal, severityTagCls } from './reportView';
 
 // Summary_Lead: rendered expanded above every disclosure drawer, before any interaction.
@@ -10,6 +11,7 @@ import { topFramingSignal, severityTagCls } from './reportView';
 // signal portion shows only when a framing signal exists; when neither applies it states plainly
 // that no summary is available rather than implying a judgment.
 export function SummaryLead({ report }: { report: AnalysisReport }): JSX.Element {
+  const { t } = useT();
   const tldr = report.tldr?.trim() ? report.tldr : undefined;
   const top = topFramingSignal(report.framingSignals);
 
@@ -17,7 +19,7 @@ export function SummaryLead({ report }: { report: AnalysisReport }): JSX.Element
     <div className="card summary-lead">
       {tldr && (
         <div>
-          <div className="section-label">Summary</div>
+          <div className="section-label">{t('report.section.summary')}</div>
           <p className="tldr">{tldr}</p>
         </div>
       )}
@@ -26,16 +28,16 @@ export function SummaryLead({ report }: { report: AnalysisReport }): JSX.Element
         <div className="top-signal">
           {/* Adjacent text label carries the "most important" meaning so the amber underline
               below is never the sole signal of emphasis (color-never-alone, Req 1.4, 7.1). */}
-          <div className="section-label">Most important framing signal</div>
+          <div className="section-label">{t('report.framing.topSignal')}</div>
           <div className="row">
             <h4 className="mis-underline">{top.technique}</h4>
-            <span className={`tag ${severityTagCls(top.severity)}`}>{top.severity} severity</span>
+            <span className={`tag ${severityTagCls(top.severity)}`}>{t('report.framing.severity', { severity: top.severity })}</span>
           </div>
           <p>{top.description}</p>
         </div>
       )}
 
-      {!tldr && !top && <p className="tldr">No summary available for this analysis.</p>}
+      {!tldr && !top && <p className="tldr">{t('report.empty.summary')}</p>}
     </div>
   );
 }

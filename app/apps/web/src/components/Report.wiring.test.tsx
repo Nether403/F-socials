@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { LanguageProvider } from '../i18n/context';
 import { Report } from './Report';
 import type { AnalysisReport } from '../api/types';
 
@@ -54,7 +55,7 @@ describe('Report footer + dispute modal wiring', () => {
   // 3.10 — the footer dispute control opens the Dispute_Modal (role="dialog").
   it('links to methodology and opens the dispute modal from the footer', async () => {
     const user = userEvent.setup();
-    render(<Report report={fakeReport} onBack={() => {}} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} /></LanguageProvider>);
 
     const link = screen.getByRole('link', { name: /methodology/i });
     expect(link).toHaveAttribute('href', '#/methodology');
@@ -70,7 +71,7 @@ describe('Report footer + dispute modal wiring', () => {
   // 3.9 — a confirmation message is shown on success.
   it('submits a dispute and shows the received confirmation', async () => {
     const user = userEvent.setup();
-    render(<Report report={fakeReport} onBack={() => {}} />);
+    render(<LanguageProvider><Report report={fakeReport} onBack={() => {}} /></LanguageProvider>);
 
     await user.click(screen.getByRole('button', { name: /dispute this analysis/i }));
 

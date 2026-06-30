@@ -11,9 +11,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Report } from './Report';
+import { renderWithLang } from '../test/renderWithLang';
 import type { AnalysisReport, ReportStatus } from '../api/types';
 
 // Report imports submitFlag and DisputeModal imports submitDispute from this one module.
@@ -102,7 +103,7 @@ afterEach(cleanup);
 
 describe('status notice (Req 8.6, 8.7)', () => {
   it('needs_review shows the held-for-review label with all content still intact', () => {
-    const { container } = render(<Report report={makeReport('needs_review')} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport('needs_review')} onBack={() => {}} />);
 
     // 8.6 — a visible text label states the analysis is awaiting review.
     expect(screen.getByText(/held for human review/i)).toBeInTheDocument();
@@ -116,7 +117,7 @@ describe('status notice (Req 8.6, 8.7)', () => {
   });
 
   it('ready shows no review notice (Req 8.7)', () => {
-    const { container } = render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     expect(screen.queryByText(/held for human review/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/showing it transparently/i)).not.toBeInTheDocument();
@@ -129,7 +130,7 @@ describe('status notice (Req 8.6, 8.7)', () => {
 describe('dispute modal focus trap + restore (Req 7.4, 7.5)', () => {
   it('traps focus within the modal while open', async () => {
     const user = userEvent.setup();
-    render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     await user.click(screen.getByRole('button', { name: /dispute this analysis/i }));
     const dialog = screen.getByRole('dialog');
@@ -150,7 +151,7 @@ describe('dispute modal focus trap + restore (Req 7.4, 7.5)', () => {
 
   it('restores focus to the opener button when the modal closes (Req 7.5)', async () => {
     const user = userEvent.setup();
-    render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     const opener = screen.getByRole('button', { name: /dispute this analysis/i });
     await user.click(opener);
@@ -165,7 +166,7 @@ describe('dispute modal focus trap + restore (Req 7.4, 7.5)', () => {
 
 describe('color-never-alone adjacency (Req 7.1)', () => {
   it('pairs the amber underline with the "Most important framing signal" text label', () => {
-    const { container } = render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     // The amber-underlined signal carries an adjacent text label identifying it — the emphasis
     // is conveyed by text, never by the underline color alone.
@@ -181,7 +182,7 @@ describe('color-never-alone adjacency (Req 7.1)', () => {
 
   it('renders source-tier chips as text labels adjacent to their color indicator', async () => {
     const user = userEvent.setup();
-    render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     // Open Other Angles so the perspective's SourceTierChip + IssueFrameChip render.
     await user.click(screen.getByRole('button', { name: /other angles/i }));
@@ -202,7 +203,7 @@ describe('no verdict tokens in feature-owned copy (Req 8.3)', () => {
 
   it('feature labels, the coverage-angle note, and chip copy carry no verdict tokens', async () => {
     const user = userEvent.setup();
-    const { container } = render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     // Expand every drawer so all feature-owned copy regions are mounted.
     for (const name of [/claim ledger/i, /framing signals/i, /useful context/i, /other angles/i, /issue-frame position/i]) {
@@ -233,7 +234,7 @@ describe('no verdict tokens in feature-owned copy (Req 8.3)', () => {
 
 describe('responsive single-column smoke (Req 7.6)', () => {
   it('renders a vertical drawer stack with no page-level tab bar', () => {
-    const { container } = render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
 
     // The mutually-exclusive tab bar was replaced by independent drawers, so there is no .tabs
     // element; the drawers are siblings in a single-column stack by construction.
@@ -255,7 +256,7 @@ describe('responsive single-column smoke (Req 7.6)', () => {
 
 describe('theming smoke (Req 7.9)', () => {
   it('sources its icons from lucide-react', () => {
-    const { container } = render(<Report report={makeReport('ready')} onBack={() => {}} />);
+    const { container } = renderWithLang(<Report report={makeReport('ready')} onBack={() => {}} />);
     // lucide-react renders <svg class="lucide lucide-...">; the drawer chevrons + header icons
     // all come from it, so at least one lucide svg is present on the rendered controls.
     expect(container.querySelector('svg.lucide')).not.toBeNull();

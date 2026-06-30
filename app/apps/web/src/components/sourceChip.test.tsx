@@ -9,9 +9,10 @@
 // behavioural contract (correct tier -> correct label, nothing extra) across all
 // four tier values and arbitrary source names/URLs.
 import { describe, it, expect } from 'vitest';
-import { render, fireEvent, cleanup, screen } from '@testing-library/react';
+import { fireEvent, cleanup, screen } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
+import { renderWithLang } from '../test/renderWithLang';
 import type { AnalysisReport, Citation, SourceTier } from '../api/types';
 
 // The tier -> label contract required by Requirement 2.9. Re-declared here so the
@@ -71,7 +72,7 @@ describe('Property 4: a source chip renders its tier label and never a creator',
           supports: null,
         };
 
-        const { container } = render(<Report report={reportWithCitation(citation)} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={reportWithCitation(citation)} onBack={() => {}} />);
         try {
           // Claims sit behind a collapsed disclosure drawer (progressive-disclosure-report-ui
           // Req 2.1); open it, then expand the claim's own drawer where citations live.

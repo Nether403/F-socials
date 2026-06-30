@@ -5,6 +5,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryLead } from './SummaryLead';
+import { LanguageProvider } from '../i18n/context';
 import type { AnalysisReport, FramingSignal } from '../api/types';
 
 afterEach(cleanup);
@@ -34,10 +35,15 @@ function buildReport(tldr: string | undefined, framingSignals: FramingSignal[]):
   };
 }
 
+// Helper: wrap in LanguageProvider so useT resolves.
+function renderWithLang(ui: React.ReactElement) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
+
 describe('SummaryLead branches', () => {
   it('first paint: renders both the TLDR and the most-important framing signal', () => {
     const tldr = 'This clip argues a single policy with charged wording.';
-    const { container } = render(<SummaryLead report={buildReport(tldr, [signal])} />);
+    const { container } = renderWithLang(<SummaryLead report={buildReport(tldr, [signal])} />);
 
     // TLDR content.
     expect(screen.getByText(tldr)).toBeTruthy();
@@ -55,7 +61,7 @@ describe('SummaryLead branches', () => {
   });
 
   it('color-never-alone: the amber underline carries an adjacent visible text label (Req 1.4)', () => {
-    const { container } = render(<SummaryLead report={buildReport(undefined, [signal])} />);
+    const { container } = renderWithLang(<SummaryLead report={buildReport(undefined, [signal])} />);
 
     // The soft amber underline marks the signal technique.
     const underline = container.querySelector('.mis-underline');
@@ -67,7 +73,7 @@ describe('SummaryLead branches', () => {
 
   it('TLDR-only: renders the TLDR and omits the framing-signal portion (Req 1.6)', () => {
     const tldr = 'A concise summary with no framing signals detected.';
-    render(<SummaryLead report={buildReport(tldr, [])} />);
+    renderWithLang(<SummaryLead report={buildReport(tldr, [])} />);
 
     expect(screen.getByText(tldr)).toBeTruthy();
     expect(screen.getByText('Summary')).toBeTruthy();
@@ -78,7 +84,7 @@ describe('SummaryLead branches', () => {
   });
 
   it('signal-only: whitespace TLDR is treated as absent and the TLDR portion is omitted (Req 1.7)', () => {
-    render(<SummaryLead report={buildReport('   \n\t  ', [signal])} />);
+    renderWithLang(<SummaryLead report={buildReport('   \n\t  ', [signal])} />);
 
     // Signal section renders.
     expect(screen.getByText(signal.technique)).toBeTruthy();
@@ -89,7 +95,7 @@ describe('SummaryLead branches', () => {
   });
 
   it('no-summary: with no TLDR and no signals, renders exactly the honest-absence statement (Req 1.8)', () => {
-    render(<SummaryLead report={buildReport('  ', [])} />);
+    renderWithLang(<SummaryLead report={buildReport('  ', [])} />);
 
     expect(screen.getByText('No summary available for this analysis.')).toBeTruthy();
     // Neither portion is present.

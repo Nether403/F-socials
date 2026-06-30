@@ -59,6 +59,7 @@ vi.mock('./analytics', { spy: true });
 import * as analytics from './analytics';
 import App from './App';
 import { Report } from './components/Report';
+import { LanguageProvider } from './i18n/context';
 import type { UseSession } from './auth/useSession';
 
 const trackSpy = vi.mocked(analytics.track);
@@ -170,7 +171,7 @@ describe('consent gate (Req 12.5, 12.6)', () => {
 describe('view + interaction events carry the right category + report id (Req 12.1, 12.2)', () => {
   it('emits one view event with route + report id on open (App hash-route effect)', () => {
     analytics.grantConsent();
-    render(<App />);
+    render(<LanguageProvider><App /></LanguageProvider>);
 
     // The home view fires exactly one 'view' event, keyed by route (report id undefined).
     const viewCalls = trackSpy.mock.calls.filter((c) => c[0] === 'view');
@@ -182,7 +183,7 @@ describe('view + interaction events carry the right category + report id (Req 12
     analytics.grantConsent();
     const user = userEvent.setup();
 
-    render(<Report report={report} onBack={() => {}} />);
+    render(<LanguageProvider><Report report={report} onBack={() => {}} /></LanguageProvider>);
     await user.click(screen.getByRole('button', { name: /share/i }));
 
     expect(trackSpy).toHaveBeenCalledWith('share', { reportId: 'report-abc' });
@@ -193,7 +194,7 @@ describe('view + interaction events carry the right category + report id (Req 12
     const user = userEvent.setup();
 
     // An active session so the flag passes the auth gate and actually emits.
-    render(<Report report={report} onBack={() => {}} session={activeSession} />);
+    render(<LanguageProvider><Report report={report} onBack={() => {}} session={activeSession} /></LanguageProvider>);
     await user.click(screen.getByRole('button', { name: /framing signals/i }));
     await user.click(screen.getByRole('button', { name: 'Flag this technique' }));
 
@@ -207,7 +208,7 @@ describe('view + interaction events carry the right category + report id (Req 12
     analytics.grantConsent();
     const user = userEvent.setup();
 
-    render(<Report report={report} onBack={() => {}} />);
+    render(<LanguageProvider><Report report={report} onBack={() => {}} /></LanguageProvider>);
     await user.click(screen.getByRole('button', { name: /dispute this analysis/i }));
     await user.type(screen.getByLabelText(/your reason/i), 'This was mischaracterized.');
     await user.click(screen.getByRole('button', { name: /submit dispute/i }));
@@ -222,7 +223,7 @@ describe('analytics never disrupts the UI (Req 12.7)', () => {
     analytics.grantConsent();
     const user = userEvent.setup();
 
-    render(<Report report={report} onBack={() => {}} />);
+    render(<LanguageProvider><Report report={report} onBack={() => {}} /></LanguageProvider>);
     expect(screen.getByText('Test analysis')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /dispute this analysis/i }));
@@ -238,7 +239,7 @@ describe('analytics never disrupts the UI (Req 12.7)', () => {
 describe('DOM + accessibility tree identical with/without analytics (Req 12.8)', () => {
   it('renders byte-identical DOM with no a11y violations whether consent is granted or not', async () => {
     // No consent (events withheld): capture markup + a11y baseline.
-    const { container: c1 } = render(<Report report={report} onBack={() => {}} />);
+    const { container: c1 } = render(<LanguageProvider><Report report={report} onBack={() => {}} /></LanguageProvider>);
     const htmlWithheld = c1.innerHTML;
     expectAxe(await axe(c1, AXE_OPTS)).toHaveNoViolations();
     cleanup();
@@ -246,7 +247,7 @@ describe('DOM + accessibility tree identical with/without analytics (Req 12.8)',
     // Consent granted (events flowing): markup must match exactly — track has no
     // render side effects, so the DOM and the derived a11y tree are unchanged.
     analytics.grantConsent();
-    const { container: c2 } = render(<Report report={report} onBack={() => {}} />);
+    const { container: c2 } = render(<LanguageProvider><Report report={report} onBack={() => {}} /></LanguageProvider>);
     const htmlActive = c2.innerHTML;
     expectAxe(await axe(c2, AXE_OPTS)).toHaveNoViolations();
 

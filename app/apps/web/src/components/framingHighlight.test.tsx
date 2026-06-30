@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import fc from 'fast-check';
+import { LanguageProvider } from '../i18n/context';
 import { Report } from './Report';
 import type { AnalysisReport, FramingSignal } from '../api/types';
 
@@ -41,7 +42,7 @@ describe('Property 12: framing highlights expose a programmatic description', ()
             examples: [{ text: quote, explanation, startIndex, endIndex }],
           };
 
-          render(<Report report={makeReport(transcript, signal)} onBack={() => {}} />);
+          render(<LanguageProvider><Report report={makeReport(transcript, signal)} onBack={() => {}} /></LanguageProvider>);
           try {
             // Move to the Framing tab so the transcript (with highlights) renders.
             fireEvent.click(screen.getByRole('button', { name: /framing signals/i }));

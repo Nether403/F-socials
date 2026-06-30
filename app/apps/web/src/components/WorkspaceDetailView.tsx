@@ -37,6 +37,7 @@ import type {
   SharedCollection,
   WorkspaceRole,
 } from '../api/types';
+import { useT, useFmt } from '../i18n/context';
 
 // Workspace_Detail_View (#/workspaces/:id) — members, shared collections, collection
 // items, and classroom annotations for a single workspace the reader belongs to.
@@ -58,10 +59,7 @@ import type {
 
 const ACCENT = '#0d9488';
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
+// ponytail: formatTime replaced by useFmt().formatDate from the i18n layer
 
 function errMessage(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
@@ -103,12 +101,13 @@ export function WorkspaceDetailView({
   onForbidden,
   onAuthError,
 }: WorkspaceDetailViewProps) {
+  const { t } = useT();
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [status, setStatus] = useState('');
 
   async function load() {
     setPhase({ kind: 'loading' });
-    setStatus('Loading the workspace…');
+    setStatus(t('workspaces.detail.loading'));
     try {
       const [members, collections] = await Promise.all([
         listMembers(workspaceId, token),
@@ -119,8 +118,12 @@ export function WorkspaceDetailView({
       const role = members.find((m) => m.readerId === currentReaderId)?.role ?? 'member';
       setPhase({ kind: 'ready', members, collections, role });
       setStatus(
-        `Loaded ${members.length} member${members.length === 1 ? '' : 's'} and ` +
-          `${collections.length} collection${collections.length === 1 ? '' : 's'}.`,
+        t('workspaces.detail.loaded', {
+          members: String(members.length),
+          ms: members.length === 1 ? '' : 's',
+          collections: String(collections.length),
+          cs: collections.length === 1 ? '' : 's',
+        }),
       );
     } catch (e) {
       onAuthError?.(e);
@@ -155,9 +158,9 @@ export function WorkspaceDetailView({
             className="btn btn-ghost"
             onClick={back}
             style={{ height: 34, padding: '0 12px' }}
-            aria-label="Back to your workspaces"
+            aria-label={t('workspaces.detail.backLabel')}
           >
-            <ArrowLeft size={15} aria-hidden="true" /> Back
+            <ArrowLeft size={15} aria-hidden="true" /> {t('workspaces.detail.back')}
           </button>
           <h2 className="editorial">
             <Users
@@ -165,12 +168,13 @@ export function WorkspaceDetailView({
               aria-hidden="true"
               style={{ color: ACCENT, verticalAlign: '-3px', marginRight: 6 }}
             />
-            {workspaceName ?? 'Workspace'}
+            {workspaceName ?? t('workspaces.detail.heading')}
           </h2>
           <div className="meta-row">
             <span>
-              Shared members, collections, and notes
-              {phase.kind === 'ready' ? ` — you are ${phase.role === 'owner' ? 'an owner' : 'a member'}` : ''}.
+              {phase.kind === 'ready'
+                ? t('workspaces.detail.subtitle', { role: phase.role === 'owner' ? 'an owner' : 'a member' })
+                : t('workspaces.detail.subtitleNoRole')}
             </span>
           </div>
         </div>
@@ -180,9 +184,9 @@ export function WorkspaceDetailView({
             style={{ height: 38, padding: '0 14px', flexShrink: 0 }}
             onClick={() => void load()}
             disabled={phase.kind === 'loading'}
-            aria-label="Refresh this workspace"
+            aria-label={t('workspaces.detail.refreshLabel')}
           >
-            <RefreshCw size={15} aria-hidden="true" /> Refresh
+            <RefreshCw size={15} aria-hidden="true" /> {t('workspaces.detail.refresh')}
           </button>
         </div>
       </div>
@@ -195,7 +199,7 @@ export function WorkspaceDetailView({
       {phase.kind === 'loading' && (
         <div className="loading" role="status" aria-live="polite">
           <div className="spinner" />
-          <div className="section-label">Loading the workspace…</div>
+          <div className="section-label">{t('workspaces.detail.loading')}</div>
         </div>
       )}
 
@@ -208,7 +212,7 @@ export function WorkspaceDetailView({
         >
           <ShieldAlert size={20} aria-hidden="true" style={{ marginBottom: 6 }} />
           <p style={{ margin: 0 }}>
-            You do not have access to this workspace. Ask an owner for an invite to join.
+            {t('workspaces.detail.forbidden')}
           </p>
         </div>
       )}
@@ -220,10 +224,10 @@ export function WorkspaceDetailView({
           </div>
           <div className="error-actions">
             <button className="btn" onClick={() => void load()}>
-              <RefreshCw size={15} aria-hidden="true" /> Retry
+              <RefreshCw size={15} aria-hidden="true" /> {t('workspaces.detail.retry')}
             </button>
             <button className="btn btn-ghost" onClick={back}>
-              Back
+              {t('workspaces.detail.back')}
             </button>
           </div>
         </div>
@@ -274,19 +278,20 @@ function MembersSection({
   onAuthError?: (error: unknown) => void;
   announce: (message: string) => void;
 }) {
+  const { t } = useT();
   const [rows, setRows] = useState<Membership[]>(members);
 
   useEffect(() => setRows(members), [members]);
 
   function handleRemoved(readerId: string) {
     setRows((r) => r.filter((m) => m.readerId !== readerId));
-    announce('Member removed from the workspace.');
+    announce(t('workspaces.detail.memberRemoved'));
   }
 
   return (
     <section aria-label="Members" style={{ marginTop: 18 }}>
       <h3 className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Users size={15} aria-hidden="true" style={{ color: ACCENT }} /> Members ({rows.length})
+        <Users size={15} aria-hidden="true" style={{ color: ACCENT }} /> {t('workspaces.detail.members', { n: String(rows.length) })}
       </h3>
       <ul className="workspace-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {rows.map((m) => (
@@ -321,6 +326,7 @@ function MemberRow({
   onAuthError?: (error: unknown) => void;
   onRemoved: (readerId: string) => void;
 }) {
+  const { t } = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -352,7 +358,7 @@ function MemberRow({
           fontSize: 12,
         }}
       >
-        {member.role === 'owner' ? 'Owner' : 'Member'}
+        {member.role === 'owner' ? t('workspaces.role.owner') : t('workspaces.role.member')}
       </span>
       {canRemove && (
         <button
@@ -361,9 +367,9 @@ function MemberRow({
           style={{ height: 32, padding: '0 10px' }}
           onClick={() => void remove()}
           disabled={busy}
-          aria-label={`Remove member ${member.readerId}`}
+          aria-label={t('workspaces.detail.removeMemberLabel', { id: member.readerId })}
         >
-          <UserMinus size={14} aria-hidden="true" /> {busy ? 'Removing…' : 'Remove'}
+          <UserMinus size={14} aria-hidden="true" /> {busy ? t('workspaces.detail.removingMember') : t('workspaces.detail.removeMember')}
         </button>
       )}
       {error && (
@@ -394,6 +400,7 @@ function CollectionsSection({
   onAuthError?: (error: unknown) => void;
   announce: (message: string) => void;
 }) {
+  const { t } = useT();
   const [rows, setRows] = useState<SharedCollection[]>(collections);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -411,7 +418,7 @@ function CollectionsSection({
       const created = await createCollection(workspaceId, trimmed, token);
       setRows((r) => [...r, created]);
       setName('');
-      announce(`Collection "${created.name}" created.`);
+      announce(t('workspaces.detail.collectionCreated', { name: created.name }));
     } catch (err) {
       onAuthError?.(err);
       setError(errMessage(err, 'Could not create the collection. Please try again.'));
@@ -422,25 +429,25 @@ function CollectionsSection({
 
   function handleDeleted(collectionId: string) {
     setRows((r) => r.filter((c) => c.id !== collectionId));
-    announce('Collection deleted.');
+    announce(t('workspaces.detail.collectionDeleted'));
   }
 
   return (
     <section aria-label="Shared collections" style={{ marginTop: 22 }}>
       <h3 className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Folder size={15} aria-hidden="true" style={{ color: ACCENT }} /> Collections ({rows.length})
+        <Folder size={15} aria-hidden="true" style={{ color: ACCENT }} /> {t('workspaces.detail.collections', { n: String(rows.length) })}
       </h3>
 
       <form onSubmit={create} style={{ display: 'flex', gap: 8, margin: '8px 0 12px', flexWrap: 'wrap' }}>
         <label className="sr-only" htmlFor="new-collection-name">
-          New collection name
+          {t('workspaces.detail.collectionNameLabel')}
         </label>
         <input
           id="new-collection-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="New collection name"
+          placeholder={t('workspaces.detail.collectionNamePlaceholder')}
           maxLength={100}
           style={{ flex: 1, minWidth: 160 }}
           disabled={busy}
@@ -449,9 +456,9 @@ function CollectionsSection({
           type="submit"
           className="btn"
           disabled={busy || name.trim().length === 0}
-          aria-label="Create collection"
+          aria-label={t('workspaces.detail.createCollectionLabel')}
         >
-          <FolderPlus size={15} aria-hidden="true" /> {busy ? 'Creating…' : 'Create'}
+          <FolderPlus size={15} aria-hidden="true" /> {busy ? t('workspaces.detail.creatingCollection') : t('workspaces.detail.createCollection')}
         </button>
       </form>
 
@@ -464,7 +471,7 @@ function CollectionsSection({
       {rows.length === 0 ? (
         <div className="mini-card" role="status" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
           <Inbox size={18} aria-hidden="true" style={{ marginBottom: 6 }} />
-          <p style={{ margin: 0 }}>No collections yet. Create one to start curating reports.</p>
+          <p style={{ margin: 0 }}>{t('workspaces.detail.collectionsEmpty')}</p>
         </div>
       ) : (
         <ul className="workspace-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -506,6 +513,7 @@ function CollectionCard({
   onDeleted: (collectionId: string) => void;
   announce: (message: string) => void;
 }) {
+  const { t } = useT();
   const [items, setItems] = useState<CollectionItemEntry[] | null>(null);
   const [loadingItems, setLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -544,7 +552,7 @@ function CollectionCard({
     try {
       await addCollectionItem(workspaceId, collection.id, trimmed, token);
       setReportId('');
-      announce('Report added to the collection.');
+      announce(t('workspaces.detail.reportAdded'));
       await loadItems(); // re-fetch to keep the server's newest-first order
     } catch (err) {
       onAuthError?.(err);
@@ -556,7 +564,7 @@ function CollectionCard({
 
   function handleItemRemoved(removedReportId: string) {
     setItems((cur) => (cur ? cur.filter((i) => i.reportId !== removedReportId) : cur));
-    announce('Report removed from the collection.');
+    announce(t('workspaces.detail.reportRemoved'));
   }
 
   async function remove() {
@@ -585,9 +593,9 @@ function CollectionCard({
             style={{ height: 32, padding: '0 10px' }}
             onClick={() => void remove()}
             disabled={deleting}
-            aria-label={`Delete collection ${collection.name}`}
+            aria-label={t('workspaces.detail.deleteCollectionLabel', { name: collection.name })}
           >
-            <Trash2 size={14} aria-hidden="true" /> {deleting ? 'Deleting…' : 'Delete'}
+            <Trash2 size={14} aria-hidden="true" /> {deleting ? t('workspaces.detail.deletingCollection') : t('workspaces.detail.deleteCollection')}
           </button>
         )}
       </div>
@@ -600,14 +608,14 @@ function CollectionCard({
 
       <form onSubmit={addItem} style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
         <label className="sr-only" htmlFor={`add-report-${collection.id}`}>
-          Report id to add to {collection.name}
+          {t('workspaces.detail.addReportInputLabel', { name: collection.name })}
         </label>
         <input
           id={`add-report-${collection.id}`}
           type="text"
           value={reportId}
           onChange={(e) => setReportId(e.target.value)}
-          placeholder="Report id to add"
+          placeholder={t('workspaces.detail.addReportPlaceholder')}
           style={{ flex: 1, minWidth: 160 }}
           disabled={adding}
         />
@@ -615,9 +623,9 @@ function CollectionCard({
           type="submit"
           className="btn"
           disabled={adding || reportId.trim().length === 0}
-          aria-label={`Add report to ${collection.name}`}
+          aria-label={t('workspaces.detail.addReportLabel', { name: collection.name })}
         >
-          <Plus size={15} aria-hidden="true" /> {adding ? 'Adding…' : 'Add'}
+          <Plus size={15} aria-hidden="true" /> {adding ? t('workspaces.detail.addingReport') : t('workspaces.detail.addReport')}
         </button>
       </form>
 
@@ -627,7 +635,7 @@ function CollectionCard({
         </div>
       )}
 
-      {loadingItems && <div className="section-label">Loading reports…</div>}
+      {loadingItems && <div className="section-label">{t('workspaces.detail.loadingReports')}</div>}
 
       {itemsError && (
         <div className="banner error" role="alert">
@@ -637,7 +645,7 @@ function CollectionCard({
 
       {items && items.length === 0 && !loadingItems && (
         <p className="section-label" style={{ color: 'var(--text-muted)' }}>
-          No reports in this collection yet.
+          {t('workspaces.detail.noReportsInCollection')}
         </p>
       )}
 
@@ -684,6 +692,8 @@ function CollectionItemRow({
   onRemoved: (reportId: string) => void;
   announce: (message: string) => void;
 }) {
+  const { t } = useT();
+  const { formatDate } = useFmt();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNotes, setShowNotes] = useState(false);
@@ -712,7 +722,7 @@ function CollectionItemRow({
         {/* Report reference by id only — no verdict, no tier (Req 10.1, 10.3). */}
         <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-all' }}>{item.reportId}</span>
         <span className="section-label" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-          Added {formatTime(item.addedAt)}
+          {t('workspaces.detail.addedAt', { date: formatDate(item.addedAt) })}
         </span>
         <button
           type="button"
@@ -720,9 +730,9 @@ function CollectionItemRow({
           style={{ height: 32, padding: '0 10px' }}
           onClick={() => setShowNotes((s) => !s)}
           aria-expanded={showNotes}
-          aria-label={`${showNotes ? 'Hide' : 'Show'} notes for report ${item.reportId}`}
+          aria-label={`${showNotes ? t('workspaces.detail.hideNotesLabel', { id: item.reportId }) : t('workspaces.detail.showNotesLabel', { id: item.reportId })}`}
         >
-          <MessageSquare size={14} aria-hidden="true" /> Notes
+          <MessageSquare size={14} aria-hidden="true" /> {t('workspaces.detail.notes')}
         </button>
         <button
           type="button"
@@ -730,9 +740,9 @@ function CollectionItemRow({
           style={{ height: 32, padding: '0 10px' }}
           onClick={() => void remove()}
           disabled={busy}
-          aria-label={`Remove report ${item.reportId} from the collection`}
+          aria-label={t('workspaces.detail.removeReportLabel', { id: item.reportId })}
         >
-          <Trash2 size={14} aria-hidden="true" /> {busy ? 'Removing…' : 'Remove'}
+          <Trash2 size={14} aria-hidden="true" /> {busy ? t('workspaces.detail.removingReport') : t('workspaces.detail.removeReport')}
         </button>
       </div>
 
@@ -776,6 +786,7 @@ function AnnotationsPanel({
   onAuthError?: (error: unknown) => void;
   announce: (message: string) => void;
 }) {
+  const { t } = useT();
   const [notes, setNotes] = useState<Annotation[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -813,7 +824,7 @@ function AnnotationsPanel({
       const created = await createAnnotation(workspaceId, reportId, trimmed, token);
       setNotes((cur) => [created, ...(cur ?? [])]);
       setText('');
-      announce('Note added.');
+      announce(t('workspaces.detail.noteAdded'));
     } catch (err) {
       onAuthError?.(err);
       setCreateError(errMessage(err, 'Could not add the note. Please try again.'));
@@ -824,25 +835,25 @@ function AnnotationsPanel({
 
   function handleUpdated(updated: Annotation) {
     setNotes((cur) => (cur ? cur.map((n) => (n.id === updated.id ? updated : n)) : cur));
-    announce('Note updated.');
+    announce(t('workspaces.detail.noteUpdated'));
   }
 
   function handleDeleted(annotationId: string) {
     setNotes((cur) => (cur ? cur.filter((n) => n.id !== annotationId) : cur));
-    announce('Note deleted.');
+    announce(t('workspaces.detail.noteDeleted'));
   }
 
   return (
     <div style={{ marginTop: 10, borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: 10 }}>
       <form onSubmit={create} style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
         <label className="sr-only" htmlFor={`note-${reportId}`}>
-          Add a note to report {reportId}
+          {t('workspaces.detail.addNoteInputLabel', { id: reportId })}
         </label>
         <textarea
           id={`note-${reportId}`}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Add a note for your group…"
+          placeholder={t('workspaces.detail.addNotePlaceholder')}
           maxLength={4000}
           rows={2}
           disabled={creating}
@@ -853,9 +864,9 @@ function AnnotationsPanel({
             type="submit"
             className="btn"
             disabled={creating || text.trim().length === 0}
-            aria-label="Add note"
+            aria-label={t('workspaces.detail.addNoteLabel')}
           >
-            <Plus size={15} aria-hidden="true" /> {creating ? 'Adding…' : 'Add note'}
+            <Plus size={15} aria-hidden="true" /> {creating ? t('workspaces.detail.addingNote') : t('workspaces.detail.addNote')}
           </button>
         </div>
       </form>
@@ -866,7 +877,7 @@ function AnnotationsPanel({
         </div>
       )}
 
-      {loading && <div className="section-label">Loading notes…</div>}
+      {loading && <div className="section-label">{t('workspaces.detail.loadingNotes')}</div>}
 
       {loadError && (
         <div className="banner error" role="alert">
@@ -876,7 +887,7 @@ function AnnotationsPanel({
 
       {notes && notes.length === 0 && !loading && (
         <p className="section-label" style={{ color: 'var(--text-muted)' }}>
-          No notes yet. Be the first to add one.
+          {t('workspaces.detail.noNotes')}
         </p>
       )}
 
@@ -918,6 +929,8 @@ function AnnotationRow({
   onUpdated: (updated: Annotation) => void;
   onDeleted: (annotationId: string) => void;
 }) {
+  const { t } = useT();
+  const { formatDate } = useFmt();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.text);
   const [busy, setBusy] = useState(false);
@@ -960,13 +973,13 @@ function AnnotationRow({
       {/* Attributed to the authoring reader AS A NOTE — never a verdict or rating (Req 10.6). */}
       <div className="section-label" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
         <MessageSquare size={12} aria-hidden="true" style={{ color: ACCENT, verticalAlign: '-2px', marginRight: 4 }} />
-        Note by {note.authorId} · {formatTime(note.createdAt)}
+        Note by {note.authorId} · {formatDate(note.createdAt)}
       </div>
 
       {editing ? (
         <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
           <label className="sr-only" htmlFor={`edit-note-${note.id}`}>
-            Edit note
+            {t('workspaces.detail.editNote')}
           </label>
           <textarea
             id={`edit-note-${note.id}`}
@@ -978,8 +991,8 @@ function AnnotationRow({
             style={{ width: '100%', resize: 'vertical' }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" className="btn" disabled={busy || draft.trim().length === 0} aria-label="Save note">
-              <Pencil size={14} aria-hidden="true" /> {busy ? 'Saving…' : 'Save'}
+            <button type="submit" className="btn" disabled={busy || draft.trim().length === 0} aria-label={t('workspaces.detail.saveNote')}>
+              <Pencil size={14} aria-hidden="true" /> {busy ? t('workspaces.detail.savingNote') : t('workspaces.detail.saveNote')}
             </button>
             <button
               type="button"
@@ -990,9 +1003,9 @@ function AnnotationRow({
                 setEditing(false);
                 setError(null);
               }}
-              aria-label="Cancel editing note"
+              aria-label={t('workspaces.detail.cancelEdit')}
             >
-              Cancel
+              {t('workspaces.detail.cancelEdit')}
             </button>
           </div>
         </form>
@@ -1008,9 +1021,9 @@ function AnnotationRow({
             style={{ height: 30, padding: '0 10px' }}
             onClick={() => setEditing(true)}
             disabled={busy}
-            aria-label="Edit note"
+            aria-label={t('workspaces.detail.editNote')}
           >
-            <Pencil size={13} aria-hidden="true" /> Edit
+            <Pencil size={13} aria-hidden="true" /> {t('workspaces.detail.editNote')}
           </button>
           <button
             type="button"
@@ -1018,9 +1031,9 @@ function AnnotationRow({
             style={{ height: 30, padding: '0 10px' }}
             onClick={() => void remove()}
             disabled={busy}
-            aria-label="Delete note"
+            aria-label={t('workspaces.detail.deleteNoteLabel')}
           >
-            <Trash2 size={13} aria-hidden="true" /> {busy ? 'Deleting…' : 'Delete'}
+            <Trash2 size={13} aria-hidden="true" /> {busy ? t('workspaces.detail.deletingNote') : t('workspaces.detail.deleteNote')}
           </button>
         </div>
       )}

@@ -1,3 +1,33 @@
+import type { RateLimitConfig } from './infra/ports';
+
+// Default per-key institutional Rate_Limit when an API_Key carries no configured
+// override: 100 requests / 60-second window (Req 8.5).
+export const DEFAULT_RATE_LIMIT: RateLimitConfig = { maxRequests: 100, windowSeconds: 60 };
+
+// Window bounds (Req 8.4): minimum 1 second, maximum 86 400 seconds (24h).
+const MIN_WINDOW_SECONDS = 1;
+const MAX_WINDOW_SECONDS = 86_400;
+
+// Resolve the effective Rate_Limit config the per-key limiter (repo.institutionalHit)
+// runs with. When a key has no override → the 100/60s default (Req 8.5); otherwise the
+// key's own (maxRequests, windowSeconds), with windowSeconds constrained to [1, 86400]
+// and both fields coerced to positive integers.
+//
+// ponytail: clamp-and-floor rather than throw — the Postgres CHECK already rejects
+// out-of-range windows at write time (migration 008), so this is the belt-and-suspenders
+// for env-/in-memory-sourced configs. A stray non-positive or fractional value can never
+// produce a degenerate window (which would let the fixed-window math divide oddly or
+// allow unlimited requests).
+export function resolveRateConfig(keyRateLimit?: RateLimitConfig): RateLimitConfig {
+  if (!keyRateLimit) return { ...DEFAULT_RATE_LIMIT };
+  const maxRequests = Math.max(1, Math.floor(keyRateLimit.maxRequests));
+  const windowSeconds = Math.min(
+    MAX_WINDOW_SECONDS,
+    Math.max(MIN_WINDOW_SECONDS, Math.floor(keyRateLimit.windowSeconds)),
+  );
+  return { maxRequests, windowSeconds };
+}
+
 // A counting semaphore: at most `cap` holders concurrently. acquire() resolves when a
 // slot is free; release() hands the freed slot directly to the longest-waiting acquirer
 // (FIFO), so no scheduled lookup is starved (Req 5.4). run() is the ergonomic wrapper
@@ -135,6 +165,22 @@ if (process.argv[1] && process.argv[1] === (await import('node:url')).fileURLToP
       ran = true;
     });
     assert.equal(ran, true, 'slot must be freed after a throw');
+  }
+
+  // 4) resolveRateConfig: default when unconfigured (Req 8.5), pass-through valid
+  // configs, and clamp window/maxRequests to safe bounds (Req 8.4).
+  {
+    assert.deepEqual(resolveRateConfig(), { maxRequests: 100, windowSeconds: 60 }, 'no config → 100/60s default');
+    assert.deepEqual(
+      resolveRateConfig({ maxRequests: 500, windowSeconds: 3600 }),
+      { maxRequests: 500, windowSeconds: 3600 },
+      'valid config passes through unchanged',
+    );
+    assert.equal(resolveRateConfig({ maxRequests: 10, windowSeconds: 0 }).windowSeconds, 1, 'window floored to 1s');
+    assert.equal(resolveRateConfig({ maxRequests: 10, windowSeconds: 999_999 }).windowSeconds, 86_400, 'window capped at 86400s');
+    assert.equal(resolveRateConfig({ maxRequests: 0, windowSeconds: 60 }).maxRequests, 1, 'maxRequests floored to 1');
+    // default must be a fresh object so a caller can never mutate the shared constant
+    assert.notEqual(resolveRateConfig(), resolveRateConfig(), 'default returns a fresh object each call');
   }
 
   console.log('concurrency.ts self-check passed');

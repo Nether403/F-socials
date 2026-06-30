@@ -4,13 +4,18 @@
 import type {
   AnalysisReport,
   AuditRecord,
+  CitationRow,
+  ClaimRow,
   ContentItem,
+  EvidenceOutcome,
+  PerspectiveRow,
   RawInput,
   ReviewActionResult,
   ReviewItem,
   ReviewLifecycle,
   ReviewResolutionInput,
 } from '../types';
+import type { HumanSignal } from '../core/kpi';
 
 export interface Cache {
   get(key: string): Promise<AnalysisReport | undefined>;
@@ -189,6 +194,84 @@ export interface Repository {
   updateAnnotation(annotationId: string, text: string): Promise<void>;
   // Deletes the annotation (Req 7.5). Caller has enforced authorization.
   deleteAnnotation(annotationId: string): Promise<void>;
+
+  // --- Institutional API keys (intervention-and-scale) ---
+  // Generates a URL-safe API key, persists only its SHA-256 hash, enforces <=10
+  // active keys per institution (throws ActiveKeyLimit when exceeded; Req 6.7).
+  // Returns the key id + plaintext (shown once, unrecoverable; Req 6.8).
+  createApiKey(institutionId: string): Promise<{ keyId: string; plaintext: string }>;
+  // Looks up by hash; returns undefined for revoked/unknown keys (Req 6.3).
+  findApiKeyByHash(hash: string): Promise<{ keyId: string; institutionId: string; rateLimit?: RateLimitConfig } | undefined>;
+  // Revokes by flipping revoked_at; idempotent (Req 6.4).
+  revokeApiKey(keyId: string): Promise<void>;
+  // Count of non-revoked keys for the institution (Req 6.7 limit enforcement).
+  countActiveApiKeys(institutionId: string): Promise<number>;
+
+  // --- Per-key institutional rate limiting (intervention-and-scale) ---
+  // Fixed-window rate-limit hit for the given key with the provided config.
+  // Reuses the existing RateLimitResult shape (Req 8.x).
+  institutionalHit(keyId: string, cfg: RateLimitConfig): Promise<RateLimitResult>;
+
+  // --- Trust-gate config (intervention-and-scale) ---
+  // Optional runtime override row for a capability; undefined when no row exists
+  // (env is the floor/source of truth).
+  getTrustGateConfig(capability: string): Promise<TrustGateConfigRow | undefined>;
+
+  // --- Read-only metric aggregates (intervention-and-scale) ---
+  // Enumerate all Evidence_Outcomes from audit records (read-only, for KPI recomputation).
+  listEvidenceOutcomes(): Promise<Array<{ reportId: string; claimId: string; evidenceOutcome: EvidenceOutcome }>>;
+  // Enumerate all Human_Signals (disputes/flags/expert-review) referencing
+  // report+claim id only — no submitter identity (Req 8.7).
+  listHumanSignals(): Promise<HumanSignal[]>;
+
+  // --- Read-only Report_Graph query methods (intervention-and-scale) ---
+  // Claims with filtering + pagination (Req 7.1, 9.1, 9.4).
+  queryClaims(filter: ClaimFilter): Promise<{ items: ClaimRow[]; totalCount: number }>;
+  // Citations belonging to a single claim (Req 9.1).
+  listCitationsForClaim(claimUid: string): Promise<CitationRow[]>;
+  // Perspective links for a report (Req 9.1).
+  listPerspectivesForReport(reportId: string): Promise<PerspectiveRow[]>;
+  // Aggregate claim/report counts grouped by source domain (Req 9.4).
+  aggregateByDomain(): Promise<DomainAggregate[]>;
+  // Aggregate report counts grouped by topic/issue-frame label (Req 9.4).
+  aggregateByTopic(): Promise<TopicAggregate[]>;
+}
+
+// --- Intervention & scale types (intervention-and-scale) ---
+
+export interface RateLimitConfig {
+  maxRequests: number;
+  windowSeconds: number; // validated 1..86400
+}
+
+export interface TrustGateConfigRow {
+  capability: string;
+  coverageMin: number;
+  agreementMin: number;
+  legalReviewOk: boolean;
+  updatedAt: string; // ISO 8601
+}
+
+export interface ClaimFilter {
+  reportId?: string;
+  keyword?: string;
+  fromDate?: string; // ISO date
+  toDate?: string; // ISO date
+  topic?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface DomainAggregate {
+  domain: string;
+  reportCount: number;
+  claimCount: number;
+  meanCitedClaimRatio: number;
+}
+
+export interface TopicAggregate {
+  issueFrameLabel: string;
+  reportCount: number;
 }
 
 export interface RateLimitResult {

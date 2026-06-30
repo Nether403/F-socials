@@ -24,6 +24,7 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import * as axeMatchers from 'vitest-axe/matchers';
 import { AuthPanel } from './AuthPanel';
+import { LanguageProvider } from '../i18n/context';
 import { useSession } from '../auth/useSession';
 import {
   AuthTimeoutError,
@@ -109,7 +110,7 @@ function Harness({ client, onSuccess }: { client: AuthClient; onSuccess?: () => 
 }
 
 function renderPanel(client: AuthClient, onSuccess?: () => void) {
-  return render(<Harness client={client} onSuccess={onSuccess} />);
+  return render(<LanguageProvider><Harness client={client} onSuccess={onSuccess} /></LanguageProvider>);
 }
 
 // Fill the email + password fields with valid credentials (real-timer tests).

@@ -22,6 +22,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import * as axeMatchers from 'vitest-axe/matchers';
+import { LanguageProvider } from '../i18n/context';
 import { WorkspaceListView } from './WorkspaceListView';
 import type { WorkspaceSummary } from '../api/types';
 
@@ -53,6 +54,7 @@ function renderList(overrides: Partial<Parameters<typeof WorkspaceListView>[0]> 
   const onBack = vi.fn();
   const onAuthError = vi.fn();
   const utils = render(
+    <LanguageProvider>
     <WorkspaceListView
       isAuthConfigured
       token={TOKEN}
@@ -60,7 +62,8 @@ function renderList(overrides: Partial<Parameters<typeof WorkspaceListView>[0]> 
       onBack={onBack}
       onAuthError={onAuthError}
       {...overrides}
-    />,
+    />
+    </LanguageProvider>,
   );
   return { ...utils, onOpenWorkspace, onBack, onAuthError };
 }

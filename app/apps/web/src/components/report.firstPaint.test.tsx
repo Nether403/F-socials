@@ -1,9 +1,10 @@
 // Feature: progressive-disclosure-report-ui, Property 2: Every supporting section is collapsed on first paint
 // Validates: Requirements 1.5, 2.1
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
+import { renderWithLang } from '../test/renderWithLang';
 import type {
   AnalysisReport,
   Citation,
@@ -111,7 +112,7 @@ describe('Property 2: Every supporting section is collapsed on first paint', () 
   it('renders every drawer collapsed (aria-expanded=false), no drawer content in the DOM, SummaryLead expanded', () => {
     fc.assert(
       fc.property(report, (r) => {
-        const { container } = render(<Report report={r} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={r} onBack={() => {}} />);
         try {
           // Every disclosure control reports collapsed. The only [role=button][aria-expanded]
           // elements at first paint are the section drawer heads — ClaimCard heads and the

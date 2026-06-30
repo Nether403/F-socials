@@ -1,9 +1,10 @@
 // Feature: progressive-disclosure-report-ui, Property 12: Rendering never mutates the report
 // Validates: Requirements 8.1, 8.5
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { cleanup, fireEvent } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
+import { renderWithLang } from '../test/renderWithLang';
 import type {
   AnalysisReport,
   Citation,
@@ -114,7 +115,7 @@ describe('Property 12: Rendering never mutates the report', () => {
       fc.property(report, (r) => {
         // Deep snapshot of the exact object graph before React touches it.
         const clone = structuredClone(r);
-        const { container } = render(<Report report={r} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={r} onBack={() => {}} />);
         try {
           // Exercise the interaction handlers: expand the first couple of drawers (and toggle one
           // back) so any write-back during open/collapse would surface as a diff against the clone.

@@ -23,6 +23,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import * as axeMatchers from 'vitest-axe/matchers';
+import { LanguageProvider } from '../i18n/context';
 import { WorkspaceDetailView } from './WorkspaceDetailView';
 import type { Annotation, CollectionItemEntry, Membership, SharedCollection } from '../api/types';
 
@@ -125,6 +126,7 @@ function renderDetail(overrides: Partial<Parameters<typeof WorkspaceDetailView>[
   const onForbidden = vi.fn();
   const onAuthError = vi.fn();
   const utils = render(
+    <LanguageProvider>
     <WorkspaceDetailView
       workspaceId={WORKSPACE_ID}
       token={TOKEN}
@@ -134,7 +136,8 @@ function renderDetail(overrides: Partial<Parameters<typeof WorkspaceDetailView>[
       onForbidden={onForbidden}
       onAuthError={onAuthError}
       {...overrides}
-    />,
+    />
+    </LanguageProvider>,
   );
   return { ...utils, onBack, onForbidden, onAuthError };
 }

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { getPolicy } from '../api/client';
 import type { PolicyDescriptor } from '../api/types';
+import { useT } from '../i18n/context';
 
 // A glossary term defined on its first use (Requirement 1.10). The definition is
 // both visible in-line and exposed to assistive tech via the native <dfn>/title.
@@ -58,6 +59,7 @@ const REVIEW_STATUSES: { name: string; meaning: string }[] = [
 ];
 
 export function Methodology({ onBack }: { onBack: () => void }) {
+  const { t } = useT();
   // null while loading; PolicyDescriptor on success; 'unavailable' if the fetch fails.
   const [policy, setPolicy] = useState<PolicyDescriptor | 'unavailable' | null>(null);
 
@@ -86,11 +88,11 @@ export function Methodology({ onBack }: { onBack: () => void }) {
       <div className="report-head">
         <div>
           <button className="btn btn-ghost" onClick={onBack} style={{ height: 34, padding: '0 12px' }}>
-            <ArrowLeft size={15} /> Back
+            <ArrowLeft size={15} /> {t('methodology.back')}
           </button>
-          <h2 className="editorial">How f-Socials works</h2>
+          <h2 className="editorial">{t('methodology.heading')}</h2>
           <div className="meta-row">
-            <span>A plain-language explanation of our method.</span>
+            <span>{t('methodology.subtitle')}</span>
           </div>
         </div>
       </div>

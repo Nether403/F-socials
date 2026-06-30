@@ -1,9 +1,24 @@
 import './env'; // side-effect: load .env before reading process.env below
+import type { Capability, TrustThresholds } from './core/trustGate';
 
 // Parse a boolean env var: "true"/"1" → true, "false"/"0" → false, unset → fallback.
 function boolEnv(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value === '') return fallback;
   return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+// Parse a numeric env var: valid finite number → that number, anything else → fallback.
+function numEnv(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === '') return fallback;
+  const n = parseFloat(value.trim());
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// Parse a trust-gate threshold env var into the [0,1] range: unset/invalid → 0.0,
+// out-of-range finite values clamp to the nearest bound (Req 1.5, 12.2).
+function thresholdEnv(value: string | undefined): number {
+  const n = numEnv(value, 0.0);
+  return n < 0 ? 0 : n > 1 ? 1 : n;
 }
 
 const isDeployed = process.env.NODE_ENV === 'production';
@@ -83,6 +98,14 @@ export const config = {
   // Deliberately NOT added to missingRequiredConfig — absent telemetry never blocks startup (Req 3.3).
   sentryDsn: (process.env.SENTRY_DSN ?? '').trim(),
   posthogKey: (process.env.POSTHOG_KEY ?? '').trim(),
+
+  // Per-capability trust-gate thresholds, exposed on the config object but read LIVE
+  // on every access (getter re-reads process.env), so a threshold/legal-flag change
+  // takes effect on the next evaluation with no restart (Req 1.7, 1.9, 12.4).
+  // Env is the floor; callers needing repo overrides pass them to getTrustGateConfig().
+  get trustThresholds(): Record<Capability, TrustThresholds> {
+    return getTrustGateConfig();
+  },
 };
 
 // A telemetry backend is "configured" only when its config value is a non-empty string;
@@ -109,4 +132,51 @@ export function missingRequiredConfig(env: Env, mode: 'deployed' | 'dev'): strin
   }
   if (absent('CORS_ORIGIN')) missing.push('CORS_ORIGIN');
   return missing;
+}
+
+// Trust gate — per-capability thresholds, read live every evaluation (Req 1.5, 1.7, 1.8, 12.2, 12.4, 12.6).
+// Defaults are 0.0/false so every capability is dark until explicitly enabled.
+// Never hard-codes passing values. Supports optional repo override (env as the floor).
+export function getTrustGateConfig(
+  repoOverrides?: Partial<Record<Capability, Partial<TrustThresholds>>>,
+): Record<Capability, TrustThresholds> {
+  const env = process.env;
+  const base: Record<Capability, TrustThresholds> = {
+    feed_friction: {
+      citationCoverageMin: thresholdEnv(env.TRUST_FEED_COVERAGE_MIN),
+      modelHumanAgreementMin: thresholdEnv(env.TRUST_FEED_AGREEMENT_MIN),
+      legalReviewComplete: boolEnv(env.TRUST_FEED_LEGAL_OK, false),
+    },
+    institutional_api: {
+      citationCoverageMin: thresholdEnv(env.TRUST_API_COVERAGE_MIN),
+      modelHumanAgreementMin: thresholdEnv(env.TRUST_API_AGREEMENT_MIN),
+      legalReviewComplete: boolEnv(env.TRUST_API_LEGAL_OK, false),
+    },
+    coaching: {
+      citationCoverageMin: thresholdEnv(env.TRUST_COACH_COVERAGE_MIN),
+      modelHumanAgreementMin: thresholdEnv(env.TRUST_COACH_AGREEMENT_MIN),
+      legalReviewComplete: boolEnv(env.TRUST_COACH_LEGAL_OK, false),
+    },
+  };
+
+  if (!repoOverrides) return base;
+
+  // Merge: repo row overrides only when its value exceeds the env floor (env is the minimum).
+  for (const cap of Object.keys(base) as Capability[]) {
+    const over = repoOverrides[cap];
+    if (!over) continue;
+    if (over.citationCoverageMin !== undefined && over.citationCoverageMin > base[cap].citationCoverageMin) {
+      base[cap].citationCoverageMin = over.citationCoverageMin;
+    }
+    if (over.modelHumanAgreementMin !== undefined && over.modelHumanAgreementMin > base[cap].modelHumanAgreementMin) {
+      base[cap].modelHumanAgreementMin = over.modelHumanAgreementMin;
+    }
+    // legalReviewComplete: repo can only make it stricter (true overrides false is meaningless;
+    // but if env is true and repo says false, env floor wins → keep true)
+    if (over.legalReviewComplete !== undefined) {
+      base[cap].legalReviewComplete = base[cap].legalReviewComplete || over.legalReviewComplete;
+    }
+  }
+
+  return base;
 }

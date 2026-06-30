@@ -19,7 +19,8 @@ import {
 } from './infra/telemetry/active';
 import type { EvidenceProvider, LLMProvider, PerspectiveProvider, Providers } from './providers/types';
 import { mockEvidence, mockLLM, mockNormalizer, mockPerspective, mockValidator } from './providers/mock';
-import { makeGeminiLLM } from './providers/gemini';
+import { makeGeminiLLM, callGeminiText } from './providers/gemini';
+import type { LLMProvider as CoachingLLM } from './core/coaching';
 import { makeGoogleFactCheckEvidence } from './providers/googleFactCheck';
 import { makeTavilyEvidence } from './providers/tavily';
 import { makeGdeltEvidence } from './providers/gdelt';
@@ -152,6 +153,28 @@ function selectLLM(): LLMProvider {
   return mockLLM;
 }
 
+// --- Coaching LLM seam selection (Gemini text generation, else offline mock) ---
+// The coaching engine wants a `{ analyze(prompt): Promise<string> }` seam — free
+// text in, free text out (it parses the JSON array itself). When Gemini is
+// configured we reuse callGeminiText (raw text generation + model fallback); with
+// no key we return a mock that yields '[]' (coaching parses '[]' as "no issues").
+// The coaching trust gate defaults dark offline, so coaching 503s before this
+// mock is ever reached — it only keeps the zero-keys path composing without keys.
+function selectCoachingLLM(): CoachingLLM {
+  if (config.gemini.apiKey) {
+    console.log(`[providers] Coaching LLM: Gemini (${config.gemini.model}` +
+      (config.gemini.backupModel ? ` → backup ${config.gemini.backupModel})` : ')'));
+    const opts = {
+      apiKey: config.gemini.apiKey,
+      model: config.gemini.model,
+      backupModel: config.gemini.backupModel || undefined,
+    };
+    return { analyze: (prompt: string) => callGeminiText(opts, prompt) };
+  }
+  console.log('[providers] Coaching LLM: mock (offline — coaching gate is dark offline)');
+  return { analyze: async () => '[]' };
+}
+
 // --- Evidence provider selection (EVIDENCE_PROVIDER in .env) ---
 // 'chain' = Google Fact Check → Tavily (authoritative first, broad retrieval as fallback).
 // GDELT can be inserted into this chain later. Single-provider values also supported.
@@ -216,6 +239,7 @@ export interface AppContext {
   limiter: RateLimiter;
   telemetry: Telemetry;
   providers: Providers;
+  coachingLLM: CoachingLLM;
   meta: WorkerMeta;
 }
 
@@ -255,5 +279,5 @@ export function buildContext(): AppContext {
     sourcePolicyVersion: SOURCE_POLICY_VERSION,
   };
 
-  return { repo, cache, queue, limiter, telemetry, providers, meta };
+  return { repo, cache, queue, limiter, telemetry, providers, coachingLLM: selectCoachingLLM(), meta };
 }

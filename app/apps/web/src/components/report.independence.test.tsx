@@ -1,9 +1,10 @@
 // Feature: progressive-disclosure-report-ui, Property 4: Toggling one drawer leaves every other drawer unchanged
 // Validates: Requirements 2.7
 import { describe, it, expect } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { cleanup, fireEvent } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
+import { renderWithLang } from '../test/renderWithLang';
 import type {
   AnalysisReport,
   Claim,
@@ -90,7 +91,7 @@ describe('Property 4: Toggling one drawer leaves every other drawer unchanged', 
   it('toggling a single drawer flips only its own aria-expanded and content visibility', () => {
     fc.assert(
       fc.property(reportArb, fc.nat(), (report, rawTarget) => {
-        const { container } = render(<Report report={report} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={report} onBack={() => {}} />);
         try {
           const heads = Array.from(container.querySelectorAll<HTMLElement>('.disclosure-head'));
           // issueFrame is always present, so all five drawers render.

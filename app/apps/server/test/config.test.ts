@@ -181,3 +181,116 @@ test('Property 12: exposed config values match the verbatim trimmed env (single-
   assert.equal(config.sentryDsn, telemetryConfigValue(process.env.SENTRY_DSN));
   assert.equal(config.posthogKey, telemetryConfigValue(process.env.POSTHOG_KEY));
 });
+
+// Feature: intervention-and-scale, Task 2.3: Per-capability trust-gate config.
+// Validates: Requirements 1.5, 1.7, 1.8, 12.2, 12.4, 12.6.
+//
+// (a) Unset env => every threshold defaults to 0.0 / false (capability dark by default; never
+//     hard-coded passing values — Req 1.5, 12.2, 12.6).
+// (b) Numeric thresholds parse and CLAMP into [0,1] for any env string (Req 1.5, 12.2).
+// (c) Per-capability independence: each capability reads only its own TRUST_{FEED,API,COACH}_*
+//     vars (Req 1.7, 12.4).
+// (d) The config.trustThresholds getter reads LIVE — a mutation to process.env is reflected on
+//     the next access with no restart (Req 1.8, 12.6; supports hot-reload Req 1.9/12.3/12.5).
+
+import { getTrustGateConfig } from '../src/config';
+
+const TRUST_VARS = [
+  'TRUST_FEED_COVERAGE_MIN', 'TRUST_FEED_AGREEMENT_MIN', 'TRUST_FEED_LEGAL_OK',
+  'TRUST_API_COVERAGE_MIN', 'TRUST_API_AGREEMENT_MIN', 'TRUST_API_LEGAL_OK',
+  'TRUST_COACH_COVERAGE_MIN', 'TRUST_COACH_AGREEMENT_MIN', 'TRUST_COACH_LEGAL_OK',
+] as const;
+
+function clearTrustVars() {
+  for (const v of TRUST_VARS) delete process.env[v];
+}
+
+test('Task 2.3: unset trust env => 0.0 / false for every capability (dark by default)', () => {
+  const saved = TRUST_VARS.map((v) => process.env[v]);
+  try {
+    clearTrustVars();
+    const cfg = getTrustGateConfig();
+    for (const cap of ['feed_friction', 'institutional_api', 'coaching'] as const) {
+      assert.equal(cfg[cap].citationCoverageMin, 0.0);
+      assert.equal(cfg[cap].modelHumanAgreementMin, 0.0);
+      assert.equal(cfg[cap].legalReviewComplete, false);
+    }
+  } finally {
+    TRUST_VARS.forEach((v, i) => { if (saved[i] === undefined) delete process.env[v]; else process.env[v] = saved[i]!; });
+  }
+});
+
+test('Task 2.3: numeric thresholds parse and clamp into [0,1] for any env string', () => {
+  const saved = TRUST_VARS.map((v) => process.env[v]);
+  try {
+    fc.assert(
+      fc.property(
+        // Any string: numbers (in/below/above range), junk, whitespace, empty.
+        fc.oneof(
+          fc.double({ noNaN: true }).map(String),
+          fc.string(),
+          fc.constantFrom('', '  ', 'NaN', 'abc', '-0.5', '1.5', '0.5', '2e9', '-3'),
+        ),
+        (raw) => {
+          clearTrustVars();
+          process.env.TRUST_FEED_COVERAGE_MIN = raw;
+          process.env.TRUST_FEED_AGREEMENT_MIN = raw;
+          const t = getTrustGateConfig().feed_friction;
+          for (const v of [t.citationCoverageMin, t.modelHumanAgreementMin]) {
+            assert.ok(Number.isFinite(v), `threshold must be finite, got ${v}`);
+            assert.ok(v >= 0 && v <= 1, `threshold must be within [0,1], got ${v} for raw=${JSON.stringify(raw)}`);
+          }
+        },
+      ),
+      { numRuns: 200 },
+    );
+  } finally {
+    TRUST_VARS.forEach((v, i) => { if (saved[i] === undefined) delete process.env[v]; else process.env[v] = saved[i]!; });
+  }
+});
+
+test('Task 2.3: thresholds are per-capability independent and read live', async () => {
+  const saved = TRUST_VARS.map((v) => process.env[v]);
+  const { config } = await import('../src/config');
+  try {
+    clearTrustVars();
+    // Configure FEED only; API and COACH must remain at their defaults (independence, Req 1.7/12.4).
+    process.env.TRUST_FEED_COVERAGE_MIN = '0.8';
+    process.env.TRUST_FEED_AGREEMENT_MIN = '0.7';
+    process.env.TRUST_FEED_LEGAL_OK = 'true';
+
+    let cfg = config.trustThresholds; // live getter
+    assert.deepEqual(cfg.feed_friction, {
+      citationCoverageMin: 0.8, modelHumanAgreementMin: 0.7, legalReviewComplete: true,
+    });
+    assert.deepEqual(cfg.institutional_api, {
+      citationCoverageMin: 0.0, modelHumanAgreementMin: 0.0, legalReviewComplete: false,
+    });
+    assert.deepEqual(cfg.coaching, {
+      citationCoverageMin: 0.0, modelHumanAgreementMin: 0.0, legalReviewComplete: false,
+    });
+
+    // Live read: flip COACH legal flag, re-access the getter — no restart, change is reflected.
+    process.env.TRUST_COACH_LEGAL_OK = '1';
+    cfg = config.trustThresholds;
+    assert.equal(cfg.coaching.legalReviewComplete, true);
+    assert.equal(cfg.feed_friction.legalReviewComplete, true); // unchanged
+  } finally {
+    TRUST_VARS.forEach((v, i) => { if (saved[i] === undefined) delete process.env[v]; else process.env[v] = saved[i]!; });
+  }
+});
+
+test('Task 2.3: repo override is honored only when it exceeds the env floor', () => {
+  const saved = TRUST_VARS.map((v) => process.env[v]);
+  try {
+    clearTrustVars();
+    process.env.TRUST_API_COVERAGE_MIN = '0.5'; // env floor
+    // Override below the floor is ignored; above the floor wins.
+    const below = getTrustGateConfig({ institutional_api: { citationCoverageMin: 0.3 } });
+    assert.equal(below.institutional_api.citationCoverageMin, 0.5);
+    const above = getTrustGateConfig({ institutional_api: { citationCoverageMin: 0.9 } });
+    assert.equal(above.institutional_api.citationCoverageMin, 0.9);
+  } finally {
+    TRUST_VARS.forEach((v, i) => { if (saved[i] === undefined) delete process.env[v]; else process.env[v] = saved[i]!; });
+  }
+});

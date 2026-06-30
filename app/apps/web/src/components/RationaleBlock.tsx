@@ -7,7 +7,7 @@ export function RationaleBlock({
   label,
   text,
 }: {
-  label: 'Why included' | 'Why this is here';
+  label: string;
   text?: string;
 }): JSX.Element | null {
   // Honest absence: omit entirely for absent/empty/whitespace-only text — no placeholder (Req 3.5).

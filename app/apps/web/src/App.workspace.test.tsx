@@ -69,6 +69,7 @@ vi.mock('./components/AuthPanel', () => ({
 }));
 
 import App from './App';
+import { LanguageProvider } from './i18n/context';
 import { AuthExpiredError, WorkspaceForbiddenError } from './api/client';
 
 // Build a fake UseSession. A token present ⇒ active session (with a reader id);
@@ -114,7 +115,7 @@ describe('Workspace routing — anonymous + Auth_Configured (Req 13.4)', () => {
   it('presents the sign-in flow and returns to the Workspace_View after signing in', async () => {
     sessionRef.current = makeSession({ token: null, configured: true });
     window.location.hash = '#/workspaces';
-    const { rerender } = render(<App />);
+    const { rerender } = render(<LanguageProvider><App /></LanguageProvider>);
     const user = userEvent.setup();
 
     // The sign-in flow is presented (not the workspace list) for an anonymous reader
@@ -132,7 +133,7 @@ describe('Workspace routing — anonymous + Auth_Configured (Req 13.4)', () => {
     // The session is now active; a re-render (the real session transition would trigger
     // one) shows the reader back on the Workspace_View, which loads their workspaces.
     sessionRef.current = makeSession({ token: 'tok-1', configured: true });
-    rerender(<App />);
+    rerender(<LanguageProvider><App /></LanguageProvider>);
 
     expect(await screen.findByRole('button', { name: /create workspace/i })).toBeInTheDocument();
     expect(screen.queryByTestId('auth-panel')).not.toBeInTheDocument();
@@ -148,7 +149,7 @@ describe('Workspace routing — 401 falls back to Anonymous (Req 13.5)', () => {
     sessionRef.current = active;
     api.listWorkspaces.mockRejectedValue(new AuthExpiredError());
     window.location.hash = '#/workspaces';
-    const { rerender } = render(<App />);
+    const { rerender } = render(<LanguageProvider><App /></LanguageProvider>);
 
     // The workspace 401 is routed through the session layer so the session is cleared.
     await waitFor(() => expect(active.handleAuthError).toHaveBeenCalledTimes(1));
@@ -156,7 +157,7 @@ describe('Workspace routing — 401 falls back to Anonymous (Req 13.5)', () => {
 
     // handleAuthError flipped the live session to Anonymous; re-rendering presents the
     // Anonymous experience (the sign-in flow on this gated route).
-    rerender(<App />);
+    rerender(<LanguageProvider><App /></LanguageProvider>);
     expect(await screen.findByTestId('auth-panel')).toBeInTheDocument();
   });
 });
@@ -169,7 +170,7 @@ describe('Workspace routing — 403 access denied (Req 13.6)', () => {
     api.listMembers.mockRejectedValue(new WorkspaceForbiddenError());
     api.listCollections.mockRejectedValue(new WorkspaceForbiddenError());
     window.location.hash = '#/workspaces/ws-secret';
-    render(<App />);
+    render(<LanguageProvider><App /></LanguageProvider>);
 
     expect(await screen.findByText(/do not have access to this workspace/i)).toBeInTheDocument();
     // No workspace data is shown: neither the members nor the collections sections render.
@@ -184,7 +185,7 @@ describe('Workspace routing — not Auth_Configured (Req 12.1–12.5)', () => {
   it('shows the unavailable message, no create/redeem forms, and sends no request (Req 12.1, 12.3)', async () => {
     sessionRef.current = makeSession({ token: null, configured: false });
     window.location.hash = '#/workspaces';
-    render(<App />);
+    render(<LanguageProvider><App /></LanguageProvider>);
 
     expect(await screen.findByText(/workspace features are unavailable/i)).toBeInTheDocument();
     // No workspace/collection/annotation control is rendered, so none can be activated;
@@ -200,13 +201,13 @@ describe('Workspace routing — not Auth_Configured (Req 12.1–12.5)', () => {
 
   it('boots to the home view without an unhandled error when not configured (Req 12.4)', () => {
     sessionRef.current = makeSession({ token: null, configured: false });
-    expect(() => render(<App />)).not.toThrow();
+    expect(() => render(<LanguageProvider><App /></LanguageProvider>)).not.toThrow();
     expect(screen.getByRole('heading', { name: /inspect before you react/i })).toBeInTheDocument();
   });
 
   it('keeps the other views working while not configured (Req 12.2, 12.5)', async () => {
     sessionRef.current = makeSession({ token: null, configured: false });
-    render(<App />);
+    render(<LanguageProvider><App /></LanguageProvider>);
 
     // Home renders and responds.
     expect(screen.getByRole('heading', { name: /inspect before you react/i })).toBeInTheDocument();

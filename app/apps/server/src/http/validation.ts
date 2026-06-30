@@ -74,3 +74,15 @@ export type AnnotationTextInput = z.infer<typeof annotationTextSchema>;
 
 // Invite code path/body parameter (Req 1.4): non-empty, bounded opaque token.
 export const inviteCodeParam = z.string().min(1).max(200);
+
+// Feed Friction query params (Req 10.5): the url to look up friction overlay for.
+export const frictionQuerySchema = z.object({ url: z.string().min(1) });
+
+export type FrictionQuery = z.infer<typeof frictionQuerySchema>;
+
+// Creator coaching request body (Req 10.5): draft text, trimmed, 1..50000 chars.
+export const coachingBodySchema = z.object({
+  draft: z.string().trim().min(1).max(50000),
+});
+
+export type CoachingBodyInput = z.infer<typeof coachingBodySchema>;

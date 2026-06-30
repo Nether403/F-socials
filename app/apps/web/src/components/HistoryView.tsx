@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Bookmark, FileText, Inbox, RefreshCw, Trash2 } from 'lucide-react';
 import { listSavedReports, unsaveReport } from '../api/client';
 import type { SavedReportEntry } from '../api/types';
+import { useT, useFmt } from '../i18n/context';
 
 // History_View (#/history) — lists an Authenticated Reader's Saved_Reports.
 //
@@ -40,10 +41,7 @@ function sortNewestFirst(entries: SavedReportEntry[]): SavedReportEntry[] {
   });
 }
 
-function formatSavedAt(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
+// ponytail: formatSavedAt replaced by useFmt().formatDate from the i18n layer
 
 type Phase =
   | { kind: 'loading' }
@@ -66,6 +64,8 @@ export interface HistoryViewProps {
 }
 
 export function HistoryView({ token, onOpenReport, onBack, onAuthError }: HistoryViewProps) {
+  const { t } = useT();
+  const { formatDate } = useFmt();
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   // Single polite live region content: load/remove outcomes are announced without
   // requiring a focus change (Req 14.9).
@@ -73,15 +73,15 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
 
   async function load() {
     setPhase({ kind: 'loading' });
-    setStatus('Loading your saved reports…');
+    setStatus(t('history.loading'));
     try {
       const entries = await withTimeout(listSavedReports(token), HISTORY_TIMEOUT_MS);
       const sorted = sortNewestFirst(entries);
       setPhase({ kind: 'ready', entries: sorted });
       setStatus(
         sorted.length === 0
-          ? 'You have no saved reports yet.'
-          : `Loaded ${sorted.length} saved report${sorted.length === 1 ? '' : 's'}.`,
+          ? t('history.emptyStatus')
+          : t('history.loaded', { n: String(sorted.length), s: sorted.length === 1 ? '' : 's' }),
       );
     } catch (e) {
       onAuthError?.(e);
@@ -103,7 +103,7 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
         ? { kind: 'ready', entries: p.entries.filter((e) => e.reportId !== reportId) }
         : p,
     );
-    setStatus('Report removed from your saved list.');
+    setStatus(t('history.removeStatus'));
   }
 
   function back() {
@@ -120,7 +120,7 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
             onClick={back}
             style={{ height: 34, padding: '0 12px' }}
           >
-            <ArrowLeft size={15} /> Back
+            <ArrowLeft size={15} /> {t('history.back')}
           </button>
           <h2 className="editorial">
             <Bookmark
@@ -128,10 +128,10 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
               aria-hidden="true"
               style={{ color: '#0d9488', verticalAlign: '-3px', marginRight: 6 }}
             />
-            Saved reports
+            {t('history.heading')}
           </h2>
           <div className="meta-row">
-            <span>The reports you have saved, most recently saved first.</span>
+            <span>{t('history.subtitle')}</span>
           </div>
         </div>
         <div className="head-actions">
@@ -140,9 +140,9 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
             style={{ height: 38, padding: '0 14px', flexShrink: 0 }}
             onClick={() => void load()}
             disabled={phase.kind === 'loading'}
-            aria-label="Refresh your saved reports"
+            aria-label={t('history.refreshLabel')}
           >
-            <RefreshCw size={15} /> Refresh
+            <RefreshCw size={15} /> {t('history.refresh')}
           </button>
         </div>
       </div>
@@ -155,7 +155,7 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
       {phase.kind === 'loading' && (
         <div className="loading" role="status" aria-live="polite">
           <div className="spinner" />
-          <div className="section-label">Loading your saved reports…</div>
+          <div className="section-label">{t('history.loading')}</div>
         </div>
       )}
 
@@ -166,10 +166,10 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
           </div>
           <div className="error-actions">
             <button className="btn" onClick={() => void load()}>
-              <RefreshCw size={15} /> Retry
+              <RefreshCw size={15} /> {t('history.retry')}
             </button>
             <button className="btn btn-ghost" onClick={back}>
-              Back
+              {t('history.back')}
             </button>
           </div>
         </div>
@@ -185,7 +185,7 @@ export function HistoryView({ token, onOpenReport, onBack, onAuthError }: Histor
         >
           <Inbox size={20} aria-hidden="true" style={{ marginBottom: 6 }} />
           <p style={{ margin: 0 }}>
-            You have no saved reports yet. Save a report from its page and it will appear here.
+            {t('history.empty')}
           </p>
         </div>
       )}
@@ -224,6 +224,8 @@ function HistoryEntryRow({
   onRemoved: (reportId: string) => void;
   onAuthError?: (error: unknown) => void;
 }) {
+  const { t } = useT();
+  const { formatDate } = useFmt();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,7 +239,7 @@ function HistoryEntryRow({
     } catch (e) {
       onAuthError?.(e);
       // Retain the entry and surface an inline error; re-enable for retry (Req 8.5).
-      setError(e instanceof Error ? e.message : 'The removal did not complete. Please try again.');
+      setError(e instanceof Error ? e.message : t('history.removeError'));
       setBusy(false);
     }
   }
@@ -250,12 +252,12 @@ function HistoryEntryRow({
           type="button"
           className="history-open"
           onClick={() => onOpenReport(entry.reportId)}
-          aria-label={`Open saved report ${entry.reportId}`}
+          aria-label={t('history.openLabel', { id: entry.reportId })}
         >
           <FileText size={15} aria-hidden="true" />
           <span className="history-report-id">{entry.reportId}</span>
         </button>
-        <div className="history-saved-at">Saved {formatSavedAt(entry.savedAt)}</div>
+        <div className="history-saved-at">{t('history.savedAt', { date: formatDate(entry.savedAt) })}</div>
       </div>
 
       <div className="history-entry-actions">
@@ -265,9 +267,9 @@ function HistoryEntryRow({
           style={{ height: 34, padding: '0 12px' }}
           onClick={() => void remove()}
           disabled={busy}
-          aria-label={`Remove saved report ${entry.reportId}`}
+          aria-label={t('history.removeLabel', { id: entry.reportId })}
         >
-          <Trash2 size={15} aria-hidden="true" /> {busy ? 'Removing…' : 'Remove'}
+          <Trash2 size={15} aria-hidden="true" /> {busy ? t('history.removing') : t('history.remove')}
         </button>
       </div>
 

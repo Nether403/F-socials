@@ -6,6 +6,7 @@ import {
   validateCredentials,
 } from '../auth/authClient';
 import type { UseSession } from '../auth/useSession';
+import { useT } from '../i18n/context';
 
 type Mode = 'sign-in' | 'sign-up';
 
@@ -41,6 +42,7 @@ export function AuthPanel({
   session: UseSession;
   onSuccess?: () => void;
 }) {
+  const { t } = useT();
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,11 +53,10 @@ export function AuthPanel({
   if (!session.configured) {
     return (
       <div className="card auth-card">
-        <div className="section-label">Account</div>
+        <div className="section-label">{t('signIn.heading')}</div>
         <div className="banner" role="status">
           <Info size={15} style={{ verticalAlign: '-2px', marginRight: 6 }} />
-          Account features are unavailable right now. You can still analyze content, open
-          reports, and read the methodology.
+          {t('signIn.unavailable')}
         </div>
       </div>
     );
@@ -101,15 +102,15 @@ export function AuthPanel({
 
   const submitLabel = submitting
     ? mode === 'sign-up'
-      ? 'Creating account…'
-      : 'Signing in…'
+      ? t('signIn.submittingSignUp')
+      : t('signIn.submittingSignIn')
     : mode === 'sign-up'
-      ? 'Create account'
-      : 'Sign in';
+      ? t('signIn.submitSignUp')
+      : t('signIn.submitSignIn');
 
   return (
     <div className="card auth-card">
-      <div className="auth-modes" role="group" aria-label="Choose sign in or create account">
+      <div className="auth-modes" role="group" aria-label={t('signIn.groupLabel')}>
         <button
           type="button"
           className={`tab ${mode === 'sign-in' ? 'active' : ''}`}
@@ -117,7 +118,7 @@ export function AuthPanel({
           onClick={() => switchMode('sign-in')}
         >
           <LogIn size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} />
-          Sign in
+          {t('signIn.tabSignIn')}
         </button>
         <button
           type="button"
@@ -126,14 +127,14 @@ export function AuthPanel({
           onClick={() => switchMode('sign-up')}
         >
           <UserPlus size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} />
-          Create account
+          {t('signIn.tabSignUp')}
         </button>
       </div>
 
-      <form onSubmit={onSubmit} noValidate aria-label={mode === 'sign-up' ? 'Create account' : 'Sign in'}>
+      <form onSubmit={onSubmit} noValidate aria-label={mode === 'sign-up' ? t('signIn.submitSignUp') : t('signIn.submitSignIn')}>
         <div className="auth-field">
           <label className="modal-label" htmlFor="auth-email">
-            Email
+            {t('signIn.email')}
           </label>
           <input
             id="auth-email"
@@ -148,7 +149,7 @@ export function AuthPanel({
 
         <div className="auth-field">
           <label className="modal-label" htmlFor="auth-password">
-            Password
+            {t('signIn.password')}
           </label>
           <input
             id="auth-password"

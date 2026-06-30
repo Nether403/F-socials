@@ -1,10 +1,11 @@
 // Feature: progressive-disclosure-report-ui, Property 13: Section counts equal their collection lengths
 // Validates: Requirements 8.2
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
 import fc from 'fast-check';
 import { Report } from './Report';
 import { sectionCounts } from './reportView';
+import { renderWithLang } from '../test/renderWithLang';
 import type {
   AnalysisReport,
   Citation,
@@ -113,7 +114,7 @@ describe('Property 13: Section counts equal their collection lengths', () => {
   it('renders each section count equal to its collection length, including the header meta-row', () => {
     fc.assert(
       fc.property(report, (r) => {
-        const { container } = render(<Report report={r} onBack={() => {}} />);
+        const { container } = renderWithLang(<Report report={r} onBack={() => {}} />);
         try {
           const expected = sectionCounts(r);
 

@@ -1,6 +1,7 @@
 // Feature: trust-and-launch-bundle, methodology unavailable path (Validates: 1.12)
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { LanguageProvider } from '../i18n/context';
 import { Methodology } from './Methodology';
 
 // Mock the API client so the /policy fetch REJECTS, exercising the graceful-degradation
@@ -13,7 +14,7 @@ describe('Methodology unavailable path (1.12)', () => {
   // 1.12 — when GET /policy fails the page degrades gracefully: it shows a neutral
   // "policy version unavailable" indication AND still renders the rest of the page.
   it('shows the unavailable indication while still rendering the page', async () => {
-    render(<Methodology onBack={() => {}} />);
+    render(<LanguageProvider><Methodology onBack={() => {}} /></LanguageProvider>);
 
     // The core page renders immediately, independent of the failing fetch.
     expect(screen.getByRole('heading', { name: /how f-socials works/i })).toBeInTheDocument();
