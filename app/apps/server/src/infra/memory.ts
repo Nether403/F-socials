@@ -8,7 +8,7 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import type { AnalysisReport, AuditRecord, CitationRow, ClaimRow, ContentItem, EvidenceOutcome, PerspectiveRow, ResolutionOutcome, ReviewActionResult, ReviewItem, ReviewKind, ReviewLifecycle, ReviewResolutionInput } from '../types';
 import type { HumanSignal } from '../core/kpi';
 import { projectReportGraph } from '../core/reportGraph';
-import type { Annotation, Cache, ClaimFilter, CollectionItemEntry, DomainAggregate, Job, JobHandler, Membership, Queue, RateLimitConfig, RateLimiter, RateLimitResult, Repository, SavedReportEntry, SharedCollection, TopicAggregate, TrustGateConfigRow, WorkspaceRole, WorkspaceSummary } from './ports';
+import type { Annotation, Cache, ClaimFilter, CollectionItemEntry, DomainAggregate, Job, JobHandler, LocalUser, Membership, Queue, RateLimitConfig, RateLimiter, RateLimitResult, Repository, SavedReportEntry, SharedCollection, TopicAggregate, TrustGateConfigRow, WorkspaceRole, WorkspaceSummary } from './ports';
 
 // Parse a Review_Item id "{kind}:{sourceId}" (e.g. "dispute:<uuid>") into its
 // parts. Returns null for any malformed id so callers map it to not_found.
@@ -80,6 +80,11 @@ export class InMemoryRepository implements Repository {
   // — at most one entry per (reader, report) by construction, mirroring the
   // Postgres PRIMARY KEY (reader_id, report_id). ponytail: non-durable.
   private savedByReader = new Map<string, Map<string, string>>();
+
+  // Local users synced from Supabase JWT claims (supabase-user-sync). Keyed by
+  // subject (== users.id). At most one Local_User per subject by construction
+  // (Req 2.1). ponytail: non-durable, single-process — same ceiling as the maps above.
+  private users = new Map<string, LocalUser>();
 
   // Institutional workspace (institutional-workspace). State mirrors the Postgres
   // tables one-for-one so the two drivers stay observably identical (Req 9.2).
@@ -298,7 +303,40 @@ export class InMemoryRepository implements Repository {
       );
   }
 
-  // ---- Institutional workspace (institutional-workspace) -------------------
+  // ---- Local user sync (supabase-user-sync) --------------------------------
+  // The only in-memory persistence path for User_Sync (Req 7.5); mirrors the
+  // Postgres ON CONFLICT (id) DO UPDATE upsert (Req 7.2). Each call runs to
+  // completion with no `await` between its read and write, so on the single-
+  // threaded event loop it is atomic by construction — concurrent syncs of one
+  // subject converge on exactly one Local_User (Req 2.6), same reasoning as the
+  // review/saved-report methods above.
+
+  async ensureLocalUser(u: { id: string; email?: string; role?: string }): Promise<void> {
+    const existing = this.users.get(u.id);
+    if (!existing) {
+      // Create: email absent ⇒ null (Req 5.1); role absent ⇒ schema default 'user'.
+      // Distinct email-absent subjects never collide — the map is keyed by id only
+      // (Req 5.2).
+      this.users.set(u.id, {
+        id: u.id,
+        email: u.email ?? null,
+        role: u.role ?? 'user',
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
+    // Merge: overwrite only when the claim is present, retain the stored value when
+    // it is absent; id + createdAt preserved (Req 2.3, 2.4, 2.5). Mirrors the
+    // Postgres COALESCE upsert.
+    if (u.email !== undefined) existing.email = u.email;
+    if (u.role !== undefined) existing.role = u.role;
+  }
+
+  async getLocalUser(id: string): Promise<LocalUser | undefined> {
+    // Defensive copy so callers can't mutate stored state through the reference.
+    const u = this.users.get(id);
+    return u ? { ...u } : undefined;
+  }
   // The only access path for Workspace data (Req 9.1); mirrors the Postgres
   // driver's results (Req 9.2). Each method runs to completion with no `await`
   // between its read and write, so on the single-threaded event loop it is atomic

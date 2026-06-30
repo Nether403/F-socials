@@ -185,7 +185,9 @@ test('routes: dispute emits {reportId, claimId}; flag emits {reportId} only (no 
 
   // Stub auth so requireAuth on the flag route passes (mirrors flag.persist.test.ts).
   const authStub = (req: Request, _res: Response, next: NextFunction): void => {
-    req.user = { id: 'user-1', email: 'u@x.test', role: 'authenticated' };
+    // Subject must be a valid UUID — the flag route validates req.user.id with
+    // syncedIdentitySchema (supabase-user-sync Req 8.2) before persisting.
+    req.user = { id: '11111111-1111-1111-1111-111111111111', email: 'u@x.test', role: 'authenticated' };
     next();
   };
 

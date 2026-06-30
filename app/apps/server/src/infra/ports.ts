@@ -77,6 +77,19 @@ export interface Annotation {
   updatedAt: string; // ISO 8601
 }
 
+// --- Local user sync (supabase-user-sync) ---
+
+// Lens-safe local user projection. Carries identity-derived fields only — id
+// (the Supabase subject), the optional email, the role, and the creation
+// timestamp. No content-truthfulness verdict and no creator-reliability rating
+// field, by construction (Req 10.2, 10.5).
+export interface LocalUser {
+  id: string; // Supabase JWT subject (UUID), == users.id
+  email: string | null;
+  role: string;
+  createdAt: string; // ISO 8601
+}
+
 export type JobHandler = (job: Job) => Promise<void>;
 
 export interface Queue {
@@ -129,6 +142,19 @@ export interface Repository {
   // so equal-timestamp rows keep a stable order across reloads (Req 9.2). Returns
   // only this reader's entries (Req 9.6, 11.8); [] when none (Req 10.8).
   listSavedReports(readerId: string): Promise<SavedReportEntry[]>;
+
+  // --- Local user sync (supabase-user-sync) ---
+  // User_Sync. Idempotent upsert of the local users row keyed to the Supabase
+  // subject, derived SOLELY from verified JWT claims — no external call (Req 1.3,
+  // 7.4). At most one row per subject; on repeat it keeps the row's id and original
+  // created_at and merges email/role from the claims, retaining a prior value when
+  // the claim omits it (Req 2.1–2.6). The only persistence path for User_Sync; both
+  // drivers are observably identical (Req 7.1, 7.2). A backing-store failure rejects
+  // so the route maps it to 5xx with no partial write and no dependent record (Req 6).
+  ensureLocalUser(user: { id: string; email?: string; role?: string }): Promise<void>;
+  // Read-only lookup of the synced Local_User by subject; undefined when none.
+  // Supports parity/round-trip verification across drivers (Req 7.2).
+  getLocalUser(id: string): Promise<LocalUser | undefined>;
 
   // --- Workspaces & membership (institutional-workspace) ---
   // The only persistence path for Workspace data (Req 9.1); both drivers return

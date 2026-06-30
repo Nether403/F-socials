@@ -86,3 +86,15 @@ export const coachingBodySchema = z.object({
 });
 
 export type CoachingBodyInput = z.infer<typeof coachingBodySchema>;
+
+// Identity-sync trust boundary (Req 8.2-8.5). The subject must be a non-empty,
+// UUID-formatted string; a present email must be a valid address <=320 chars; a
+// present role must be a non-empty string <=255 chars. Built from the verified
+// AuthUser and parsed before User_Sync runs or any record is persisted.
+export const syncedIdentitySchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email().max(320).optional(),
+  role: z.string().min(1).max(255).optional(),
+});
+
+export type SyncedIdentity = z.infer<typeof syncedIdentitySchema>;

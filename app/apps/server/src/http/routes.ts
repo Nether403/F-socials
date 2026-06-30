@@ -25,6 +25,7 @@ import {
   inviteCodeParam,
   frictionQuerySchema,
   coachingBodySchema,
+  syncedIdentitySchema,
 } from './validation';
 import { requireAuth, reviewerGuard, apiKeyAuth } from './auth';
 import { sendNeutral } from './respond';
@@ -253,10 +254,29 @@ export function makeRouter(deps: { repo: Repository; cache: Cache; queue: Queue;
         .status(400)
         .json({ error: 'invalid_technique', details: { allowed: [...techniques] } });
     }
+    // Validate the verified identity at the trust boundary BEFORE syncing or
+    // persisting (Req 8.2). Malformed subject / out-of-bounds claim => 400, no
+    // side effect (Req 8.3, 8.5).
+    const identity = syncedIdentitySchema.safeParse({
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role,
+    });
+    if (!identity.success) {
+      return res.status(400).json({ error: 'invalid_identity', details: identity.error.flatten() });
+    }
+    // Ensure the local users row exists before the FK-bearing insert (Req 1.1, 3.1).
+    // A sync failure fails the action cleanly with no flag persisted (Req 6).
+    try {
+      await deps.repo.ensureLocalUser(identity.data);
+    } catch (err) {
+      deps.telemetry.capture(err, { stage: 'user_sync', reportId: id }); // report id only — no subject
+      return res.status(500).json({ error: 'sync_failed' }); // generic, no internals (Req 6.1)
+    }
     await deps.repo.createFlag({
       id: randomUUID(),
       reportId: id,
-      userId: req.user!.id,
+      userId: identity.data.id, // == subject => resolves to the synced Local_User (Req 3.2)
       technique: parsed.data.technique,
       note: parsed.data.note,
       createdAt: new Date().toISOString(),

@@ -17,7 +17,9 @@ import { InMemoryCache, InMemoryQueue, InMemoryRepository, InMemoryRateLimiter }
 import { noopTelemetry } from '../src/infra/telemetry/noop';
 import type { AnalysisReport, FramingSignal } from '../src/types';
 
-const USER = { id: 'user-1', email: 'u@x.test', role: 'authenticated' as const };
+// Identity subject must be a valid UUID — the flag route validates req.user.id
+// with syncedIdentitySchema (supabase-user-sync Req 8.2) before persisting.
+const USER = { id: '11111111-1111-1111-1111-111111111111', email: 'u@x.test', role: 'authenticated' as const };
 const TECHNIQUES = ['Emotional Language', 'Us vs Them', 'Fearmongering', 'Loaded Language'];
 const REPORT_ID = 'report-under-test';
 

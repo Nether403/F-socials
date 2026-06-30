@@ -26,6 +26,7 @@ import type {
   ClaimFilter,
   CollectionItemEntry,
   DomainAggregate,
+  LocalUser,
   Membership,
   RateLimitConfig,
   RateLimitResult,
@@ -215,6 +216,41 @@ export class PostgresRepository implements Repository {
        ON CONFLICT (report_id, user_id, technique) DO NOTHING`,
       [f.id, f.reportId, f.userId, f.technique, f.note ?? null, f.createdAt],
     );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // User_Sync (supabase-user-sync). Idempotent upsert of the local users row keyed
+  // to the Supabase subject, derived SOLELY from verified JWT claims — no external
+  // call. Parameterized SQL only, no string interpolation (Req 8.1).
+
+  // Single INSERT … ON CONFLICT (id) DO UPDATE. created_at is never in the SET list,
+  // so it is preserved on repeat (Req 2.3). email/role params bind NULL when the
+  // claim is absent; COALESCE retains the stored value in that case (Req 2.5) and
+  // updates when the claim is present (Req 2.4). The statement is atomic, so
+  // concurrent syncs converge on exactly one row (Req 2.6) and a failed insert
+  // rejects with no partial row (Req 6.3).
+  async ensureLocalUser(u: { id: string; email?: string; role?: string }): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO users (id, email, role)
+       VALUES ($1, $2, COALESCE($3, 'user'))
+       ON CONFLICT (id) DO UPDATE SET
+         email = COALESCE($2, users.email),
+         role  = COALESCE($3, users.role)`,
+      [u.id, u.email ?? null, u.role ?? null],
+    );
+  }
+
+  // Read-only lookup of the synced Local_User by subject; created_at normalized to
+  // ISO 8601, undefined when none (Req 7.2).
+  async getLocalUser(id: string): Promise<LocalUser | undefined> {
+    const r = await this.pool.query(
+      `SELECT id, email, role, created_at FROM users WHERE id = $1`,
+      [id],
+    );
+    const row = r.rows[0];
+    return row
+      ? { id: row.id, email: row.email ?? null, role: row.role, createdAt: new Date(row.created_at).toISOString() }
+      : undefined;
   }
 
   // Best-effort audit write: the full AuditRecord goes in the JSONB `data` column,
