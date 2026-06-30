@@ -57,10 +57,22 @@ const skip = DB_URL
 
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../../db/migrations');
 
+// True when an error is a benign "this object is already there" no-op: either the
+// normal "already exists" message, or — when two migration runs apply the same DDL
+// to one shared DB concurrently — a unique_violation (23505) on a Postgres system
+// catalog (pg_extension / pg_type / pg_namespace, etc.). The latter is the racy
+// form of CREATE EXTENSION/TYPE and is just as safe to swallow as "already exists".
+function isAlreadyExists(e: unknown): boolean {
+  const err = e as { message?: string; code?: string; table?: string };
+  if (/already exists/i.test(err?.message ?? '')) return true;
+  return err?.code === '23505' && (err?.table ?? '').startsWith('pg_');
+}
+
 // Apply every db/migrations/*.sql in lexical order (001..009), tolerating the
-// "already exists" / "already" no-op errors a reused test DB raises — mirrors
-// scripts/migrate.mjs. Migration 009 (DROP NOT NULL on users.email) is required
-// here so an email-absent synced user is storable.
+// "already exists" no-op errors (and their concurrent-race 23505 equivalent) a
+// reused/shared test DB raises — mirrors scripts/migrate.mjs. Migration 009
+// (DROP NOT NULL on users.email) is required here so an email-absent synced user
+// is storable.
 async function applyMigrations(pool: Pool): Promise<void> {
   const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
   for (const file of files) {
@@ -68,7 +80,7 @@ async function applyMigrations(pool: Pool): Promise<void> {
     try {
       await pool.query(sql);
     } catch (e) {
-      if (!/already exists/i.test((e as Error).message)) throw e;
+      if (!isAlreadyExists(e)) throw e;
     }
   }
 }

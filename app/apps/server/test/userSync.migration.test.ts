@@ -48,13 +48,20 @@ function readMigration(file: string): string {
 }
 
 // Apply a migration file, swallowing "already exists" so a DB that has already
-// been migrated is fine (mirrors scripts/migrate.mjs). Re-throws anything else.
+// been migrated is fine (mirrors scripts/migrate.mjs). Also swallows the
+// concurrent-race equivalent: a unique_violation (23505) on a Postgres system
+// catalog (pg_extension / pg_type / …) that surfaces when two migration runs
+// apply the same CREATE EXTENSION/TYPE to one shared DB at once. Re-throws
+// anything else.
 async function applyMigration(pool: import('pg').Pool, file: string): Promise<void> {
   try {
     await pool.query(readMigration(file));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (!/already exists/i.test(msg)) throw e;
+    const err = e as { message?: string; code?: string; table?: string };
+    const alreadyExists =
+      /already exists/i.test(err?.message ?? '') ||
+      (err?.code === '23505' && (err?.table ?? '').startsWith('pg_'));
+    if (!alreadyExists) throw e;
   }
 }
 
