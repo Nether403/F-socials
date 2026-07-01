@@ -7,18 +7,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import express from 'express';
 import fc from 'fast-check';
 
-import { makeRouter } from '../src/http/routes';
-import { InMemoryCache, InMemoryQueue, InMemoryRateLimiter, InMemoryRepository } from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
+import { withTestApp } from './helpers/makeTestApp';
+import type { Repository } from '../src/infra/ports';
 import type { AnalysisReport } from '../src/types';
 
 const REPORT_ID = 'report-under-test';
 
-function seedReport(repo: InMemoryRepository): Promise<void> {
+function seedReport(repo: Repository): Promise<void> {
   const now = new Date().toISOString();
   const report: AnalysisReport = {
     id: REPORT_ID,
@@ -48,28 +45,11 @@ const reasonArb = fc
   .map((chars) => chars.join(''));
 
 test('Property 5: a valid anonymous dispute is persisted with no user identity', async () => {
-  const repo = new InMemoryRepository();
-  await seedReport(repo);
+  await withTestApp({ auth: 'real' }, async (app) => {
+    const repo = app.repo;
+    await seedReport(repo);
+    const url = `${app.apiBase}/analyses/${REPORT_ID}/disputes`;
 
-  const app = express()
-    .use(express.json())
-    .use(
-      '/api/v1',
-      makeRouter({
-        repo,
-        cache: new InMemoryCache(),
-        queue: new InMemoryQueue(),
-        limiter: new InMemoryRateLimiter(1000),
-        telemetry: noopTelemetry,
-      }),
-    );
-
-  const server = http.createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  const { port } = server.address() as import('node:net').AddressInfo;
-  const url = `http://127.0.0.1:${port}/api/v1/analyses/${REPORT_ID}/disputes`;
-
-  try {
     await fc.assert(
       fc.asyncProperty(reasonArb, async (reason) => {
         // Fresh dispute log each run so "exactly one" is meaningful.
@@ -95,7 +75,5 @@ test('Property 5: a valid anonymous dispute is persisted with no user identity',
       }),
       { numRuns: 100 },
     );
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+  });
 });

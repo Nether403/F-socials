@@ -5,40 +5,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import type { AddressInfo } from 'node:net';
-import express from 'express';
-import { makeRouter } from '../src/http/routes';
-import { optionalAuth } from '../src/http/auth';
-import {
-  InMemoryCache,
-  InMemoryQueue,
-  InMemoryRateLimiter,
-  InMemoryRepository,
-} from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
+import { withTestApp } from './helpers/makeTestApp';
+import type { Repository } from '../src/infra/ports';
 import type { AnalysisReport } from '../src/types';
 
-function buildApp() {
-  const repo = new InMemoryRepository();
-  const cache = new InMemoryCache();
-  const queue = new InMemoryQueue();
-  const limiter = new InMemoryRateLimiter(10);
-  const app = express()
-    .use(express.json())
-    .use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
-  return { app, repo };
-}
-
-async function withServer(fn: (base: string, repo: InMemoryRepository) => Promise<void>) {
-  const { app, repo } = buildApp();
-  const server = app.listen(0);
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const { port } = server.address() as AddressInfo;
-  try {
-    await fn(`http://127.0.0.1:${port}`, repo);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+// Boots the real router behind the deployed optionalAuth gate so these tests
+// exercise the real protected-route 401 behaviour.
+async function withServer(fn: (base: string, repo: Repository) => Promise<void>) {
+  await withTestApp({ auth: 'real' }, (app) => fn(app.base, app.repo));
 }
 
 test('GET /api/v1/me rejects an unauthenticated request with 401', async () => {

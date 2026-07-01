@@ -17,54 +17,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import type { AddressInfo } from 'node:net';
-import express, { type NextFunction, type Request, type Response } from 'express';
-import { makeRouter } from '../src/http/routes';
-import { optionalAuth } from '../src/http/auth';
-import {
-  InMemoryCache,
-  InMemoryQueue,
-  InMemoryRateLimiter,
-  InMemoryRepository,
-} from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
+import { withTestApp } from './helpers/makeTestApp';
+import type { Repository } from '../src/infra/ports';
 import type { AnalysisReport } from '../src/types';
 
-// Build the app with either the real optionalAuth gate (stubUserId omitted) or an
-// auth stub that sets req.user to the given reader id (stubUserId provided).
-function buildApp(stubUserId?: string) {
-  const repo = new InMemoryRepository();
-  const cache = new InMemoryCache();
-  const queue = new InMemoryQueue();
-  const limiter = new InMemoryRateLimiter(1000);
-  const auth = stubUserId
-    ? (req: Request, _res: Response, next: NextFunction): void => {
-        req.user = { id: stubUserId, role: 'authenticated' };
-        next();
-      }
-    : optionalAuth;
-  const app = express()
-    .use(express.json())
-    .use('/api/v1', auth, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
-  return { app, repo };
-}
-
+// Run `fn` against a booted app. An omitted stubUserId boots the real optionalAuth
+// gate (no token -> 401); a provided id boots the fixed-user auth seam so
+// requireAuth passes and the route's validation/scoping logic is what's exercised.
 async function withServer(
   stubUserId: string | undefined,
-  fn: (base: string, repo: InMemoryRepository) => Promise<void>,
+  fn: (base: string, repo: Repository) => Promise<void>,
 ): Promise<void> {
-  const { app, repo } = buildApp(stubUserId);
-  const server = app.listen(0);
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const { port } = server.address() as AddressInfo;
-  try {
-    await fn(`http://127.0.0.1:${port}`, repo);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+  await withTestApp(
+    { auth: stubUserId ? { user: { id: stubUserId, role: 'authenticated' } } : 'real' },
+    (app) => fn(app.base, app.repo),
+  );
 }
 
-function seedReport(repo: InMemoryRepository, id: string): Promise<void> {
+function seedReport(repo: Repository, id: string): Promise<void> {
   const now = new Date().toISOString();
   const report: AnalysisReport = {
     id,

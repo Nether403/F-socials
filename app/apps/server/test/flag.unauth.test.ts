@@ -5,24 +5,14 @@
 // Validates: Requirements 3.4
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import { AddressInfo } from 'node:net';
-import express from 'express';
 import fc from 'fast-check';
-import { makeRouter } from '../src/http/routes';
-import { optionalAuth } from '../src/http/auth';
-import {
-  InMemoryRepository,
-  InMemoryCache,
-  InMemoryQueue,
-  InMemoryRateLimiter,
-} from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
+import { withTestApp } from './helpers/makeTestApp';
+import type { Repository } from '../src/infra/ports';
 import type { AnalysisReport } from '../src/types';
 
 // A ready report carrying real framing techniques, so a "valid-looking" technique
 // can't be the reason for rejection — only the missing auth can be.
-function seedReport(repo: InMemoryRepository): AnalysisReport {
+function seedReport(repo: Repository): AnalysisReport {
   const now = new Date().toISOString();
   const report: AnalysisReport = {
     id: 'report-prop7',
@@ -56,27 +46,10 @@ function seedReport(repo: InMemoryRepository): AnalysisReport {
 }
 
 test('Property 7: unauthenticated flag submissions are rejected (401) and never persisted', async () => {
-  const repo = new InMemoryRepository();
-  const report = seedReport(repo);
-  const app = express()
-    .use(express.json())
-    .use(
-      '/api/v1',
-      optionalAuth,
-      makeRouter({
-        repo,
-        cache: new InMemoryCache(),
-        queue: new InMemoryQueue(),
-        limiter: new InMemoryRateLimiter(100),
-        telemetry: noopTelemetry,
-      }),
-    );
+  await withTestApp({ auth: 'real', rateLimit: 100 }, async (app) => {
+    const repo = app.repo;
+    const report = seedReport(repo);
 
-  const server = http.createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  const port = (server.address() as AddressInfo).port;
-
-  try {
     await fc.assert(
       fc.asyncProperty(
         // Varied bodies: arbitrary techniques plus the report's real techniques,
@@ -89,7 +62,7 @@ test('Property 7: unauthenticated flag submissions are rejected (401) and never 
           note: fc.option(fc.string(), { nil: undefined }),
         }),
         async (body) => {
-          const res = await fetch(`http://127.0.0.1:${port}/api/v1/analyses/${report.id}/flags`, {
+          const res = await fetch(`${app.apiBase}/analyses/${report.id}/flags`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' }, // no Authorization header
             body: JSON.stringify(body),
@@ -103,7 +76,5 @@ test('Property 7: unauthenticated flag submissions are rejected (401) and never 
       ),
       { numRuns: 100 },
     );
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+  });
 });

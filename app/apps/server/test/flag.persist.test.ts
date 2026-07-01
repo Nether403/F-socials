@@ -9,12 +9,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AddressInfo } from 'node:net';
-import express, { type NextFunction, type Request, type Response } from 'express';
 import fc from 'fast-check';
-import { makeRouter } from '../src/http/routes';
-import { InMemoryCache, InMemoryQueue, InMemoryRepository, InMemoryRateLimiter } from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
+import { withTestApp } from './helpers/makeTestApp';
 import type { AnalysisReport, FramingSignal } from '../src/types';
 
 // Identity subject must be a valid UUID — the flag route validates req.user.id
@@ -51,27 +47,11 @@ function seededReport(): AnalysisReport {
 }
 
 test('authenticated, technique-matched flag is persisted to the report and user', async () => {
-  const repo = new InMemoryRepository();
-  const cache = new InMemoryCache();
-  const queue = new InMemoryQueue();
-  const limiter = new InMemoryRateLimiter(1000);
-  await repo.saveReport(seededReport());
+  await withTestApp({ auth: { user: USER } }, async (app) => {
+    const repo = app.repo;
+    await repo.saveReport(seededReport());
+    const url = `${app.apiBase}/analyses/${REPORT_ID}/flags`;
 
-  const authStub = (req: Request, _res: Response, next: NextFunction): void => {
-    req.user = USER;
-    next();
-  };
-
-  const app = express();
-  app.use(express.json());
-  app.use('/api/v1', authStub, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
-
-  const server = app.listen(0);
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const { port } = server.address() as AddressInfo;
-  const url = `http://127.0.0.1:${port}/api/v1/analyses/${REPORT_ID}/flags`;
-
-  try {
     await fc.assert(
       fc.asyncProperty(fc.constantFrom(...TECHNIQUES), async (technique) => {
         // Fresh flag table per run so "exactly one" is meaningful.
@@ -92,7 +72,5 @@ test('authenticated, technique-matched flag is persisted to the report and user'
       }),
       { numRuns: 100 },
     );
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+  });
 });

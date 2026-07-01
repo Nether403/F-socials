@@ -7,27 +7,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import { AddressInfo } from 'node:net';
-import express from 'express';
 import fc from 'fast-check';
-import { makeRouter } from '../src/http/routes';
-import { InMemoryRepository } from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
-import type { Cache, Queue, RateLimiter } from '../src/infra/ports';
-
-// Unused by the dispute/flag routes, but makeRouter requires the full dep set.
-const cache: Cache = { async get() { return undefined; }, async set() {} };
-const queue: Queue = { async enqueue() {}, process() {} };
-const limiter: RateLimiter = {
-  async hit() { return { allowed: true, remaining: 1, limit: 1, resetSeconds: 0 }; },
-};
-
-// Auth stub: sets req.user so the flag route exercises its 404 (not the 401).
-function authStub(req: express.Request, _res: express.Response, next: express.NextFunction): void {
-  req.user = { id: 'user-1', role: 'authenticated' };
-  next();
-}
+import { withTestApp } from './helpers/makeTestApp';
 
 async function postJson(base: string, path: string, body: unknown): Promise<number> {
   const res = await fetch(base + path, {
@@ -40,18 +21,11 @@ async function postJson(base: string, path: string, body: unknown): Promise<numb
 }
 
 test('disputes and flags on a nonexistent report 404 and persist nothing', async () => {
-  const repo = new InMemoryRepository();
-  const app = express();
-  app.use(express.json());
-  // Stub auth before the router so requireAuth passes and the 404 is reached.
-  app.use('/api/v1', authStub, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
+  // Fixed-user auth so the flag route exercises its 404 (not the 401).
+  await withTestApp({ auth: { user: { id: 'user-1', role: 'authenticated' } } }, async (app) => {
+    const repo = app.repo;
+    const base = app.base;
 
-  const server = http.createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  const { port } = server.address() as AddressInfo;
-  const base = `http://127.0.0.1:${port}`;
-
-  try {
     await fc.assert(
       fc.asyncProperty(
         // Random ids that are never seeded into the repo.
@@ -72,7 +46,5 @@ test('disputes and flags on a nonexistent report 404 and persist nothing', async
       ),
       { numRuns: 100 },
     );
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+  });
 });

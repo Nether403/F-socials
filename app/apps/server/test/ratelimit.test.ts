@@ -35,28 +35,12 @@ test('window expiry resets the budget', async () => {
 
 // End-to-end: exceeding the per-key daily limit on NEW analyses (cache misses)
 // returns HTTP 429. Validates: Requirements 5.6
-import express from 'express';
-import type { AddressInfo } from 'node:net';
-import { optionalAuth } from '../src/http/auth';
-import { makeRouter } from '../src/http/routes';
-import { InMemoryCache, InMemoryQueue, InMemoryRepository } from '../src/infra/memory';
-import { noopTelemetry } from '../src/infra/telemetry/noop';
+import { withTestApp } from './helpers/makeTestApp';
 
 test('POST /api/v1/analyses returns 429 once the daily new-analysis limit is exceeded', async () => {
-  const repo = new InMemoryRepository();
-  const cache = new InMemoryCache();
-  const queue = new InMemoryQueue();
-  const limiter = new InMemoryRateLimiter(2); // small limit so we can blow past it
-
-  const app = express()
-    .use(express.json())
-    .use('/api/v1', optionalAuth, makeRouter({ repo, cache, queue, limiter, telemetry: noopTelemetry }));
-
-  const server = app.listen(0);
-  try {
-    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
-    const { port } = server.address() as AddressInfo;
-    const url = `http://127.0.0.1:${port}/api/v1/analyses`;
+  // Anonymous (auth 'real' + no token) submitter, small limit so we can blow past it.
+  await withTestApp({ auth: 'real', rateLimit: 2 }, async (app) => {
+    const url = `${app.apiBase}/analyses`;
 
     const submit = (transcript: string) =>
       fetch(url, {
@@ -77,7 +61,5 @@ test('POST /api/v1/analyses returns 429 once the daily new-analysis limit is exc
     assert.equal(blocked.status, 429);
     const body = (await blocked.json()) as { error: string };
     assert.equal(body.error, 'rate_limited');
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+  });
 });
